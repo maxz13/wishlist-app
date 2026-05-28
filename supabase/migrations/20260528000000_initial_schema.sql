@@ -18,24 +18,6 @@ BEGIN
 END;
 $$;
 
--- Returns true if user_a and user_b are friends.
--- SECURITY DEFINER avoids recursive RLS evaluation when called from policies.
-CREATE OR REPLACE FUNCTION public.is_friend(user_a uuid, user_b uuid)
-RETURNS boolean
-LANGUAGE sql
-SECURITY DEFINER
-STABLE
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.friendships
-    WHERE user_id  = user_a
-      AND friend_id = user_b
-  );
-$$;
-
-
 -- ============================================================
 -- TABLE: profiles
 -- Public user profile linked to auth.users.
@@ -75,6 +57,23 @@ CREATE TABLE public.friendships (
 
 CREATE INDEX idx_friendships_user_id   ON public.friendships(user_id);
 CREATE INDEX idx_friendships_friend_id ON public.friendships(friend_id);
+
+-- Returns true if user_a and user_b are friends.
+-- SECURITY DEFINER avoids recursive RLS evaluation when called from policies.
+CREATE OR REPLACE FUNCTION public.is_friend(user_a uuid, user_b uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.friendships
+    WHERE user_id  = user_a
+      AND friend_id = user_b
+  );
+$$;
 
 
 -- ============================================================
