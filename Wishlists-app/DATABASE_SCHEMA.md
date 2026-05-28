@@ -132,65 +132,12 @@ created_at
 
 ## Notes
 
-Friendships are stored as mirrored rows.
+Depending on implementation:
+- friendship may be stored once;
+or
+- mirrored in both directions.
 
-When a friendship is created, two rows are inserted:
-- user_id → friend_id
-- friend_id → user_id
-
-This is the approved V1 approach.
-
-Querying friends requires only `WHERE user_id = ?`, with no UNION logic needed.
-
----
-
-# INVITES
-
-Represents friend invitations sent by users.
-
-An invite allows:
-- inviting by email (email known in advance);
-- inviting by link (email not known).
-
-When an invited user registers, the invite is resolved and a friendship is created automatically.
-
-## Fields
-
-id
-- uuid
-- primary key
-
-token
-- unique
-- required
-- used to identify the invite in the URL
-
-inviter_user_id
-- references users.id
-- required
-
-invited_email
-- optional
-- populated when invite is sent to a known email address
-
-created_at
-- timestamp
-
-accepted_at
-- optional
-- timestamp set when the invite is resolved
-
-accepted_by_user_id
-- optional
-- references users.id
-- set when the invite is resolved
-
-## Rules
-
-- token must be unique and unguessable;
-- an invite can be accepted only once;
-- accepting creates two friendship rows (mirrored);
-- invites do not expire in V1.
+Claude should choose the simplest reliable implementation.
 
 ---
 
@@ -254,7 +201,7 @@ link
 
 price
 - optional
-- numeric(10,2)
+- numeric or decimal
 
 created_at
 - timestamp
@@ -386,30 +333,6 @@ Claude must preserve:
 - relational consistency.
 
 Database integrity is more important than convenience shortcuts.
-
----
-
-# APPROVED PRODUCT DECISIONS
-
-Decisions that affect schema behavior or closely related product rules.
-
-## Email Editing
-
-Email is not editable in V1 profile forms.
-
-Email is managed through Supabase Auth only.
-
-Profile edit forms must not expose an email field.
-
-## Home Screen Empty State
-
-If the authenticated user has no friends, no birthdays, and no wishlists, the home screen must show a friendly empty state.
-
-The empty state must prompt the user to:
-- create their first wishlist;
-- or invite a friend.
-
-No complex empty-state logic. No dashboard-style fallback content.
 
 ---
 
