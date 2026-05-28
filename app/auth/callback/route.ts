@@ -17,12 +17,12 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(new URL('/', origin))
+      return NextResponse.redirect(new URL('/home', origin))
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
     if (!error) {
-      return NextResponse.redirect(new URL('/', origin))
+      return NextResponse.redirect(new URL('/home', origin))
     }
   }
 

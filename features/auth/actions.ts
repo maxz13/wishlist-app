@@ -32,7 +32,7 @@ export async function loginAction(
     return { message: 'Неверный email или пароль' }
   }
 
-  redirect('/')
+  redirect('/home')
 }
 
 export async function registerAction(
