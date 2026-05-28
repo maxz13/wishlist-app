@@ -1,17 +1,13 @@
 'use client'
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
-let client: SupabaseClient | undefined
-
-// Returns a singleton browser client.
-// Call this inside Client Components or client-side hooks only.
-export function getSupabaseBrowserClient(): SupabaseClient {
-  if (!client) {
-    client = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  }
-  return client
+// createBrowserClient maintains an internal singleton per URL+key.
+// Safe to call multiple times. Stores session in cookies (not localStorage),
+// making it compatible with Server Components.
+export function getSupabaseBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
