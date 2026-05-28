@@ -1,14 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
+import { useState, useActionState } from 'react'
 import { registerAction } from './actions'
 import type { RegisterFormState } from './schemas'
 
 const initialState: RegisterFormState = undefined
 
-export function RegisterForm() {
+export function RegisterForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState(registerAction, initialState)
+  const [name, setName] = useState('')
+  const [surname, setSurname] = useState('')
+  const [email, setEmail] = useState('')
 
   if (state?.success) {
     return (
@@ -23,6 +26,7 @@ export function RegisterForm() {
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      {next && <input type="hidden" name="next" value={next} />}
       {state?.message && (
         <p className="text-sm text-red-600">{state.message}</p>
       )}
@@ -37,6 +41,8 @@ export function RegisterForm() {
           type="text"
           autoComplete="given-name"
           required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.name && (
@@ -54,6 +60,8 @@ export function RegisterForm() {
           type="text"
           autoComplete="family-name"
           required
+          value={surname}
+          onChange={(e) => setSurname(e.target.value)}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.surname && (
@@ -71,6 +79,8 @@ export function RegisterForm() {
           type="email"
           autoComplete="email"
           required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.email && (

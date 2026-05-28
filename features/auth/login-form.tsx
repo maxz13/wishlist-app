@@ -6,11 +6,12 @@ import type { LoginFormState } from './schemas'
 
 const initialState: LoginFormState = undefined
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState(loginAction, initialState)
 
   return (
     <form action={action} className="flex flex-col gap-4">
+      {next && <input type="hidden" name="next" value={next} />}
       {state?.message && (
         <p className="text-sm text-red-600">{state.message}</p>
       )}

@@ -9,6 +9,12 @@ import {
   type RegisterFormState,
 } from './schemas'
 
+function sanitizeNext(raw: FormDataEntryValue | null): string {
+  return typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//')
+    ? raw
+    : '/home'
+}
+
 export async function loginAction(
   _prevState: LoginFormState,
   formData: FormData
@@ -32,7 +38,7 @@ export async function loginAction(
     return { message: 'Неверный email или пароль' }
   }
 
-  redirect('/home')
+  redirect(sanitizeNext(formData.get('next')))
 }
 
 export async function registerAction(
@@ -52,8 +58,10 @@ export async function registerAction(
 
   const { name, surname, email, password } = validated.data
 
+  const next = sanitizeNext(formData.get('next'))
+
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -63,8 +71,23 @@ export async function registerAction(
   })
 
   if (error) {
-    return { message: 'Ошибка регистрации. Попробуйте ещё раз.' }
+    console.error('[registerAction] Supabase signUp error:', error)
+    const detail =
+      process.env.NODE_ENV === 'development'
+        ? ` (${error.status ?? '?'}: ${error.message})`
+        : ''
+    return { message: `Ошибка регистрации. Попробуйте ещё раз.${detail}` }
   }
+
+  // If Supabase returns a session immediately (email confirmation disabled),
+  // the user is authenticated — send them directly to their intended destination.
+  if (data.session) {
+    redirect(next)
+  }
+
+  // Email confirmation is required — no active session yet.
+  // Sign out defensively in case a partial session was set.
+  await supabase.auth.signOut()
 
   return {
     success: true,
