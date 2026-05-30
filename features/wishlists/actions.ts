@@ -102,6 +102,7 @@ export async function createWishlistItemAction(
     title: titleResult.data,
     link: rawLink,
     price: priceValue,
+    is_visible: false,
   })
 
   if (error) {
@@ -198,6 +199,40 @@ export async function deleteWishlistItemAction(
 
   revalidatePath(`/wishlists/${wishlistId}`)
   redirect(`/wishlists/${wishlistId}`)
+}
+
+export async function toggleWishlistItemVisibilityAction(
+  itemId: string,
+  wishlistId: string
+): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Не авторизован' }
+
+  // Single query: fetch current is_visible and verify ownership via inner join.
+  // Returns null if item not found, wishlist not found, or caller is not the owner.
+  const { data: itemRow } = await supabase
+    .from('wishlist_items')
+    .select('is_visible, wishlists!inner(owner_id)')
+    .eq('id', itemId)
+    .eq('wishlist_id', wishlistId)
+    .eq('wishlists.owner_id', user.id)
+    .single()
+
+  if (!itemRow) return { error: 'Элемент не найден или нет доступа' }
+
+  const { error } = await supabase
+    .from('wishlist_items')
+    .update({ is_visible: !(itemRow.is_visible as boolean) })
+    .eq('id', itemId)
+
+  if (error) return { error: 'Не удалось изменить. Попробуйте ещё раз.' }
+
+  revalidatePath(`/wishlists/${wishlistId}`)
+  return {}
 }
 
 export async function reserveItemAction(

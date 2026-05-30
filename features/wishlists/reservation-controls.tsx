@@ -10,12 +10,14 @@ interface ReservationControlsProps {
   itemId: string
   wishlistId: string
   state: ReservationState
+  reserverName?: string
 }
 
 export function ReservationControls({
   itemId,
   wishlistId,
   state,
+  reserverName,
 }: ReservationControlsProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -34,7 +36,11 @@ export function ReservationControls({
   }
 
   if (state === 'other') {
-    return <p className="mt-1 text-xs text-gray-400">Зарезервировано</p>
+    return (
+      <p className="mt-1 text-xs text-gray-400">
+        {reserverName ? `Подарит ${reserverName}` : 'Зарезервировано'}
+      </p>
+    )
   }
 
   if (state === 'mine') {

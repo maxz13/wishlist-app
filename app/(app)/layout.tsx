@@ -19,7 +19,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, name, surname')
     .eq('id', user.id)
     .single()
 
@@ -42,7 +42,9 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4">
-        <span className="text-sm font-semibold">Вишлист</span>
+        <span className="min-w-0 truncate text-sm font-semibold">
+          Вишлист · {profile.name} {profile.surname}
+        </span>
         <form action={logoutAction}>
           <button type="submit" className="text-sm text-gray-500">
             Выйти

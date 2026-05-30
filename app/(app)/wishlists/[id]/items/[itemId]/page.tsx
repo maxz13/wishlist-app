@@ -8,6 +8,7 @@ type WishlistItem = {
   title: string
   link: string | null
   price: number | null
+  is_visible: boolean
 }
 
 export default async function WishlistItemPage({
@@ -25,17 +26,7 @@ export default async function WishlistItemPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data: itemData } = await supabase
-    .from('wishlist_items')
-    .select('id, title, link, price')
-    .eq('id', itemId)
-    .eq('wishlist_id', wishlistId)
-    .single()
-
-  if (!itemData) notFound()
-
-  const item = itemData as WishlistItem
-
+  // Fetch wishlist first so isOwner is known before the item query.
   const { data: wishlist } = await supabase
     .from('wishlists')
     .select('owner_id')
@@ -45,6 +36,24 @@ export default async function WishlistItemPage({
   if (!wishlist) notFound()
 
   const isOwner = wishlist.owner_id === user!.id
+
+  // Friends only see visible items; explicit filter matches product behavior.
+  let itemQuery = supabase
+    .from('wishlist_items')
+    .select('id, title, link, price, is_visible')
+    .eq('id', itemId)
+    .eq('wishlist_id', wishlistId)
+
+  if (!isOwner) {
+    itemQuery = itemQuery.eq('is_visible', true)
+  }
+
+  const { data: itemData } = await itemQuery.single()
+
+  if (!itemData) notFound()
+
+  const item = itemData as WishlistItem
+
   const backHref = fromFriend
     ? `/wishlists/${wishlistId}?fromFriend=${fromFriend}`
     : `/wishlists/${wishlistId}`

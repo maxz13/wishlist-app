@@ -14,6 +14,7 @@ type WishlistItem = {
   title: string
   link: string | null
   price: number | null
+  is_visible: boolean
 }
 
 export default async function WishlistDetailPage({
@@ -39,18 +40,26 @@ export default async function WishlistDetailPage({
 
   if (!wishlist) notFound()
 
-  const { data: itemsData } = await supabase
+  const isOwner = wishlist.owner_id === user!.id
+
+  let itemsQuery = supabase
     .from('wishlist_items')
-    .select('id, title, link, price')
+    .select('id, title, link, price, is_visible')
     .eq('wishlist_id', id)
+    .order('is_visible', { ascending: false })
     .order('created_at', { ascending: true })
 
+  if (!isOwner) {
+    itemsQuery = itemsQuery.eq('is_visible', true)
+  }
+
+  const { data: itemsData } = await itemsQuery
   const items = (itemsData ?? []) as WishlistItem[]
-  const isOwner = wishlist.owner_id === user!.id
   const backHref =
     !isOwner && fromFriend ? `/friends/${fromFriend}` : '/wishlists'
 
   const reservationByItemId = new Map<string, string>()
+  const reserverNameByItemId = new Map<string, string>()
 
   if (items.length > 0) {
     const itemIds = items.map((item) => item.id)
@@ -64,6 +73,31 @@ export default async function WishlistDetailPage({
         r.wishlist_item_id as string,
         r.reserved_by_user_id as string,
       )
+    }
+
+    // For friend view: resolve first names of other users' reservations.
+    if (!isOwner && reservationByItemId.size > 0) {
+      const otherReserverIds = [
+        ...new Set(
+          [...reservationByItemId.values()].filter((rid) => rid !== user!.id)
+        ),
+      ]
+
+      if (otherReserverIds.length > 0) {
+        const { data: reserverProfiles } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', otherReserverIds)
+
+        const nameById = new Map<string, string>(
+          (reserverProfiles ?? []).map((p) => [p.id as string, p.name as string])
+        )
+
+        for (const [itemId, reserverId] of reservationByItemId) {
+          const name = nameById.get(reserverId)
+          if (name) reserverNameByItemId.set(itemId, name)
+        }
+      }
     }
   }
 
@@ -89,8 +123,9 @@ export default async function WishlistDetailPage({
               return isOwner ? (
                 <OwnerItemRow
                   key={item.id}
-                  item={item}
+                  item={{ id: item.id, title: item.title, price: item.price, is_visible: item.is_visible }}
                   wishlistId={id}
+                  isReserved={reservationByItemId.has(item.id)}
                 />
               ) : (
                 <div key={item.id} className="flex items-start gap-3 py-3.5">
@@ -126,6 +161,7 @@ export default async function WishlistDetailPage({
                       itemId={item.id}
                       wishlistId={id}
                       state={reservationState}
+                      reserverName={reserverNameByItemId.get(item.id)}
                     />
                   </div>
                 </div>
@@ -139,6 +175,29 @@ export default async function WishlistDetailPage({
         )}
 
         {isOwner && <CreateItemSection wishlistId={id} />}
+
+        {isOwner && items.length > 0 && (
+          <div className="mt-6 flex flex-col gap-1.5 border-t border-gray-100 pt-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-500">
+                <svg width="8" height="6" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                  <path
+                    d="M1 4l3 3 5-6"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <span className="text-xs text-gray-400">виден друзьям</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 shrink-0 rounded-full bg-gray-300" />
+              <span className="text-xs text-gray-400">черновик, скрыт от друзей</span>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
