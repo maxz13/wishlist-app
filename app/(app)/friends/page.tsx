@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateInviteSection } from '@/features/friends/create-invite-section'
 
@@ -47,16 +48,21 @@ export default async function FriendsPage() {
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {friends.map((friend) => (
-            <li
-              key={friend.id}
-              className="flex items-center gap-3 rounded border border-gray-200 px-4 py-3"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
-                {friend.name[0]}{friend.surname[0]}
-              </div>
-              <span className="text-sm font-medium">
-                {friend.name} {friend.surname}
-              </span>
+            <li key={friend.id}>
+              <Link
+                href={`/friends/${friend.id}`}
+                className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
+                    {friend.name[0]}{friend.surname[0]}
+                  </div>
+                  <span className="text-sm font-medium">
+                    {friend.name} {friend.surname}
+                  </span>
+                </div>
+                <span className="text-gray-400">›</span>
+              </Link>
             </li>
           ))}
         </ul>
