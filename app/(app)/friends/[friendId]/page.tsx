@@ -52,7 +52,7 @@ export default async function FriendProfilePage({
             {wishlists.map((w) => (
               <li key={w.id}>
                 <Link
-                  href={`/wishlists/${w.id}`}
+                  href={`/wishlists/${w.id}?fromFriend=${friendId}`}
                   className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
                 >
                   <p className="text-sm font-medium text-gray-900">{w.title}</p>
