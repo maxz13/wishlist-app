@@ -50,13 +50,14 @@ export async function registerAction(
     surname: formData.get('surname'),
     email: formData.get('email'),
     password: formData.get('password'),
+    birthday: formData.get('birthday'),
   })
 
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { name, surname, email, password } = validated.data
+  const { name, surname, email, password, birthday } = validated.data
 
   const next = sanitizeNext(formData.get('next'))
 
@@ -66,7 +67,7 @@ export async function registerAction(
     password,
     options: {
       // Passed as raw_user_meta_data — picked up by the handle_new_user trigger
-      data: { name, surname },
+      data: { name, surname, birthday },
     },
   })
 

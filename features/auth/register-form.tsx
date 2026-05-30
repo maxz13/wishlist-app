@@ -70,6 +70,23 @@ export function RegisterForm({ next }: { next?: string }) {
       </div>
 
       <div className="flex flex-col gap-1">
+        <label htmlFor="birthday" className="text-sm font-medium">
+          Дата рождения
+        </label>
+        <input
+          id="birthday"
+          name="birthday"
+          type="date"
+          required
+          max={new Date().toISOString().split('T')[0]}
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
+        />
+        {state?.errors?.birthday && (
+          <p className="text-xs text-red-600">{state.errors.birthday[0]}</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
         <label htmlFor="email" className="text-sm font-medium">
           Электронная почта
         </label>
