@@ -41,7 +41,7 @@ export default async function FriendProfilePage({
       </Link>
 
       <h1 className="mt-3 text-xl font-bold leading-tight">
-        {profile.name} {profile.surname}
+        Вишлисты {profile.name} {profile.surname}
       </h1>
 
       <div className="mt-5">

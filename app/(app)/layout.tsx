@@ -41,12 +41,17 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-gray-200 bg-white px-4">
-        <span className="min-w-0 truncate text-sm font-semibold">
-          Вишлист · {profile.name} {profile.surname}
-        </span>
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+        <div className="min-w-0 flex-1 mr-4">
+          <p className="truncate text-xl font-bold leading-tight text-gray-900">
+            {profile.name}
+          </p>
+          <p className="truncate text-xl font-bold leading-tight text-gray-900">
+            {profile.surname}
+          </p>
+        </div>
         <form action={logoutAction}>
-          <button type="submit" className="text-sm text-gray-500">
+          <button type="submit" className="shrink-0 text-sm text-gray-500">
             Выйти
           </button>
         </form>
