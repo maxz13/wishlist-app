@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-type Friend = { id: string; name: string; surname: string }
+type Friend = { id: string; name: string; surname: string; birthday: string | null }
 type Wishlist = { id: string; title: string }
 type ReservationRow = {
   reservationId: string
@@ -9,6 +9,37 @@ type ReservationRow = {
   wishlistId: string
   ownerId: string
   ownerName: string
+}
+type UpcomingBirthday = { id: string; name: string; daysUntil: number; label: string }
+
+function getDaysUntilBirthday(birthdayIso: string, today: Date): number {
+  const [, month, day] = birthdayIso.split('-').map(Number)
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const thisYear = new Date(today.getFullYear(), month - 1, day)
+  const target =
+    thisYear < todayMidnight
+      ? new Date(today.getFullYear() + 1, month - 1, day)
+      : thisYear
+  return Math.round((target.getTime() - todayMidnight.getTime()) / 86_400_000)
+}
+
+function birthdayLabel(daysUntil: number): string {
+  if (daysUntil === 0) return 'сегодня 🎉'
+  const mod10 = daysUntil % 10
+  const mod100 = daysUntil % 100
+  let unit: string
+  if (mod10 === 1 && mod100 !== 11) unit = 'день'
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) unit = 'дня'
+  else unit = 'дней'
+  return `через ${daysUntil} ${unit}`
+}
+
+function moreItemsLabel(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `и ещё ${n} ${one}`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `и ещё ${n} ${few}`
+  return `и ещё ${n} ${many}`
 }
 
 export default async function HomePage() {
@@ -39,11 +70,22 @@ export default async function HomePage() {
   if (friendIds.length > 0) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, surname')
+      .select('id, name, surname, birthday')
       .in('id', friendIds)
       .order('name')
     friends = (data ?? []) as Friend[]
   }
+
+  // Upcoming birthdays — derived from friends already fetched, no extra query
+  const today = new Date()
+  const upcomingBirthdays: UpcomingBirthday[] = friends
+    .filter((f): f is Friend & { birthday: string } => f.birthday !== null)
+    .map((f) => {
+      const daysUntil = getDaysUntilBirthday(f.birthday, today)
+      return { id: f.id, name: f.name, daysUntil, label: birthdayLabel(daysUntil) }
+    })
+    .filter((entry) => entry.daysUntil <= 30)
+    .sort((a, b) => a.daysUntil - b.daysUntil)
 
   // My reservations
   const { data: reservationsData } = await supabase
@@ -107,11 +149,20 @@ export default async function HomePage() {
   const hasWishlists = wishlists.length > 0
   const hasReservations = reservationRows.length > 0
 
+  const displayedFriends   = friends.slice(0, 3)
+  const moreFriendsCount   = Math.max(0, friends.length - 3)
+
+  const displayedBirthdays = upcomingBirthdays.slice(0, 3)
+  const moreBirthdaysCount = Math.max(0, upcomingBirthdays.length - 3)
+
+  const displayedWishlists  = wishlists.slice(0, 3)
+  const moreWishlistsCount  = Math.max(0, wishlists.length - 3)
+
   // State A: nothing to show
   if (!hasFriends && !hasWishlists && !hasReservations) {
     return (
       <main className="px-4 pb-10 pt-4">
-        <h1 className="text-xl font-semibold">Главная</h1>
+        <h1 className="text-xl font-semibold">Лента</h1>
         <div className="mt-12 flex flex-col items-center gap-3 text-center">
           <p className="text-base font-medium text-gray-800">Пока здесь пусто</p>
           <p className="max-w-xs text-sm text-gray-500">
@@ -137,30 +188,37 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="px-4 pb-10 pt-8">
-      <h1 className="text-xl font-semibold">Главная</h1>
+    <main className="px-4 pb-10 pt-5">
+      <h1 className="text-xl font-semibold">Лента</h1>
 
-      <div className="mt-6 flex flex-col gap-10">
+      <div className="mt-4 flex flex-col">
 
         {/* 1. Друзья — compact text rows */}
         <section>
           <h2 className="mb-2 text-base font-semibold text-gray-900">Друзья</h2>
           {hasFriends ? (
-            <ul className="flex flex-col">
-              {friends.map((friend) => (
-                <li key={friend.id}>
-                  <Link
-                    href={`/friends/${friend.id}`}
-                    className="flex items-center gap-0.5 py-1"
-                  >
-                    <span className="text-sm text-gray-900">
-                      {friend.name} {friend.surname}
-                    </span>
-                    <span className="text-sm text-gray-400">→</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="flex flex-col">
+                {displayedFriends.map((friend) => (
+                  <li key={friend.id}>
+                    <Link
+                      href={`/friends/${friend.id}`}
+                      className="flex items-center gap-0.5 py-1"
+                    >
+                      <span className="text-sm text-gray-900">
+                        {friend.name} {friend.surname}
+                      </span>
+                      <span className="text-sm text-gray-400">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {moreFriendsCount > 0 && (
+                <Link href="/friends" className="block py-1 text-sm text-gray-500">
+                  {moreItemsLabel(moreFriendsCount, 'друг', 'друга', 'друзей')}
+                </Link>
+              )}
+            </>
           ) : (
             <div className="flex flex-col gap-1.5">
               <p className="text-sm text-gray-500">У вас пока нет друзей</p>
@@ -171,12 +229,39 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* 2. Мои вишлисты — larger card style */}
+        {/* 2. Дни рождения */}
+        {upcomingBirthdays.length > 0 && (
+          <section className="mt-8 sm:mt-10">
+            <h2 className="mb-2 text-base font-semibold text-gray-900">Дни рождения</h2>
+            <ul className="flex flex-col">
+              {displayedBirthdays.map((entry) => (
+                <li key={entry.id}>
+                  <Link
+                    href={`/friends/${entry.id}`}
+                    className="flex items-center gap-0.5 py-1"
+                  >
+                    <span className="text-sm text-gray-900">
+                      {entry.name} — {entry.label}
+                    </span>
+                    <span className="text-sm text-gray-400">→</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {moreBirthdaysCount > 0 && (
+              <Link href="/friends" className="block py-1 text-sm text-gray-500">
+                {moreItemsLabel(moreBirthdaysCount, 'день рождения', 'дня рождения', 'дней рождения')}
+              </Link>
+            )}
+          </section>
+        )}
+
+        {/* 3. Мои вишлисты — larger card style */}
         {hasWishlists && (
-          <section>
+          <section className="mt-8 sm:mt-10">
             <h2 className="mb-3 text-base font-semibold text-gray-900">Мои вишлисты</h2>
             <ul className="flex flex-col gap-2">
-              {wishlists.map((w) => (
+              {displayedWishlists.map((w) => (
                 <li key={w.id}>
                   <Link
                     href={`/wishlists/${w.id}`}
@@ -188,6 +273,11 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
+            {moreWishlistsCount > 0 && (
+              <Link href="/wishlists" className="mt-1 block py-1 text-sm text-gray-500">
+                {moreItemsLabel(moreWishlistsCount, 'вишлист', 'вишлиста', 'вишлистов')}
+              </Link>
+            )}
           </section>
         )}
 
@@ -195,15 +285,15 @@ export default async function HomePage() {
         {hasFriends && !hasWishlists && (
           <Link
             href="/wishlists"
-            className="rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-medium text-gray-700"
+            className="mt-8 rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-medium text-gray-700 sm:mt-10"
           >
             Создать первый вишлист
           </Link>
         )}
 
-        {/* 3. Я подарю — compact text rows */}
+        {/* 4. Я подарю — compact text rows */}
         {hasReservations && (
-          <section>
+          <section className="mt-8 sm:mt-10">
             <h2 className="mb-2 text-base font-semibold text-gray-900">Я подарю</h2>
             <ul className="flex flex-col">
               {reservationRows.map((row) => (
