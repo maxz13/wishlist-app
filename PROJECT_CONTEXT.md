@@ -31,6 +31,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Account deletion placeholder: "Появится в следующей версии"
 - App header: shows avatar (h-12 w-12) or initials badge alongside name
 - Username system: chosen at registration, auto-generated from transliterated name+surname (first 3 chars each), editable before submit, immutable after account creation, displayed read-only in profile
+- Wishlist archiving: owner can archive/restore from the wishlist detail page; archived wishlists disappear from the active list and are invisible to friends; shown in a muted "Архив" section at the bottom of the owner's wishlists page; items and reservations are preserved
 
 ---
 
@@ -38,9 +39,10 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 Approaching V1 release. All core features are functional and tested. Remaining work:
 
-1. **Friend search by username** — search field on `/friends` page, query by `@username`, initiate friend request
-2. **Final Things 3-inspired visual pass** — typography, spacing, card shadows, hierarchy
-3. **Deploy V1** — Vercel production deploy
+1. **Final Things 3-inspired visual pass** — typography, spacing, card shadows, hierarchy
+2. **Deploy V1** — Vercel production deploy
+
+Friend search by username is deferred to V2.0. The `friend_requests` table and RPCs exist on remote but the UI is not implemented.
 
 ---
 
@@ -55,13 +57,15 @@ Approaching V1 release. All core features are functional and tested. Remaining w
 | 20260530000002 | Birthday on registration (updated `handle_new_user` trigger) |
 | 20260531000000 | Avatars storage bucket + RLS policies |
 | 20260531000001 | Username system: column, format constraint, unique index, `transliterate_ru()`, `generate_username()`, `is_username_available()` RPC, row backfill, updated `handle_new_user` trigger |
+| 20260531000002 | Friend requests: `friend_requests` table, RLS, `search_profiles_by_username_prefix`, `send_friend_request`, `accept_friend_request`, `decline_friend_request` RPCs (UI deferred to V2.0) |
+| 20260531000003 | Wishlist archiving: updated 4 RLS policies to hide archived wishlists and their items/reservations from friends |
 
 ---
 
 ## Important technical decisions
 
 - **Tailwind v4 blue bug:** `bg-blue-500` does not render (CSS variable chain issue). Use `bg-[#3b82f6]` for any blue backgrounds. `text-blue-500` works fine for text.
-- **`bg-[#3b82f6]` dev-server CSS issue:** This class exists only in `bottom-nav.tsx`. Tailwind v4's incremental CSS compiler can intermittently drop it between hot-reloads, making the + button invisible in dev. Production build always includes it (confirmed). If the + button disappears in dev, restart `npm run dev`. Do not "fix" this in code.
+- **`bg-[#3b82f6]` dev-server CSS issue:** This class exists only in `bottom-nav.tsx`. Tailwind v4's incremental CSS compiler can intermittently drop it between hot-reloads or after significant edits to that file, making the + button invisible in dev. Production build always includes it (confirmed). If the + button disappears in dev: first try restarting `npm run dev`; if it persists, run `rm -rf .next` then restart. Do not "fix" this in code.
 - **Circular avatar pattern:** Always use `overflow-hidden rounded-full` on the wrapper element with explicit `h-* w-*` dimensions, then `h-full w-full object-cover` on the `<img>`. Never put `rounded-full` directly on the img — Tailwind v4 preflight's `img { height: auto }` can cause oval rendering in certain flex contexts.
 - **Storage path convention:** `avatars/{userId}/avatar.jpg` — each user writes only inside their own UUID folder.
 - **Avatars bucket is public** — `getPublicUrl()` returns a direct URL with cache-bust `?v=timestamp`. Privacy enforced via profiles RLS, not bucket access.

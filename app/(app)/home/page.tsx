@@ -435,7 +435,7 @@ export default async function HomePage() {
         {/* 3. Мои вишлисты — larger card style */}
         {hasWishlists && (
           <section className="mt-8 sm:mt-10">
-            <h2 className="mb-3 text-base font-semibold text-gray-900">Мои вишлисты</h2>
+            <h2 className="mb-2 text-base font-semibold text-gray-900">Мои вишлисты</h2>
             <ul className="flex flex-col gap-2">
               {displayedWishlists.map((w) => (
                 <li key={w.id}>
