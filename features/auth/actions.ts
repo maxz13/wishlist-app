@@ -48,6 +48,7 @@ export async function registerAction(
   const validated = RegisterSchema.safeParse({
     name: formData.get('name'),
     surname: formData.get('surname'),
+    username: formData.get('username'),
     email: formData.get('email'),
     password: formData.get('password'),
     birthday: formData.get('birthday'),
@@ -57,17 +58,31 @@ export async function registerAction(
     return { errors: validated.error.flatten().fieldErrors }
   }
 
-  const { name, surname, email, password, birthday } = validated.data
+  const { name, surname, username, email, password, birthday } = validated.data
 
   const next = sanitizeNext(formData.get('next'))
 
   const supabase = await createServerSupabaseClient()
+
+  // Pre-check username availability via SECURITY DEFINER RPC.
+  // Callable by unauthenticated users; UNIQUE constraint is the final guard.
+  const { data: usernameAvailable, error: rpcError } = await supabase.rpc(
+    'is_username_available',
+    { p_username: username }
+  )
+  if (rpcError) {
+    return { message: `Ошибка регистрации. Попробуйте ещё раз.` }
+  }
+  if (!usernameAvailable) {
+    return { errors: { username: ['Этот никнейм уже занят'] } }
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       // Passed as raw_user_meta_data — picked up by the handle_new_user trigger
-      data: { name, surname, birthday },
+      data: { name, surname, birthday, username },
     },
   })
 

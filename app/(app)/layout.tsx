@@ -77,7 +77,7 @@ export default async function AppLayout({
 
       <div className="flex-1 pb-16">{children}</div>
 
-      <BottomNav initials={initials} />
+      <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} />
     </div>
   )
 }

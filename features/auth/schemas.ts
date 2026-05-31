@@ -6,8 +6,14 @@ export const LoginSchema = z.object({
 })
 
 export const RegisterSchema = z.object({
-  name: z.string().min(1, 'Введите имя').trim(),
-  surname: z.string().min(1, 'Введите фамилию').trim(),
+  name: z.string().min(2, 'Минимум 2 символа').trim(),
+  surname: z.string().min(2, 'Минимум 2 символа').trim(),
+  username: z
+    .string()
+    .min(3, 'Минимум 3 символа')
+    .max(30, 'Максимум 30 символов')
+    .regex(/^[a-z][a-z0-9_]{1,28}[a-z0-9]$/, 'Только строчные буквы a–z, цифры и _')
+    .refine((v) => !/__/.test(v), 'Нельзя использовать двойное подчёркивание __'),
   email: z.string().email('Введите корректный email').trim(),
   password: z.string().min(8, 'Пароль должен содержать не менее 8 символов'),
   birthday: z
@@ -37,6 +43,7 @@ export type RegisterFormState =
       errors?: {
         name?: string[]
         surname?: string[]
+        username?: string[]
         email?: string[]
         password?: string[]
         birthday?: string[]

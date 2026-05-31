@@ -13,7 +13,7 @@ export default async function ProfilePage() {
   const [profileResult, friendsResult, wishlistsResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, name, surname, email, avatar_url, birthday')
+      .select('id, name, surname, email, avatar_url, birthday, username')
       .eq('id', user.id)
       .single(),
     supabase

@@ -30,6 +30,7 @@ type ProfileData = {
   email: string
   avatar_url: string | null
   birthday: string | null
+  username: string
 }
 
 type Stats = {
@@ -45,7 +46,11 @@ type Props = {
 export function ProfileForm({ profile, stats }: Props) {
   const [name, setName] = useState(profile.name)
   const [surname, setSurname] = useState(profile.surname)
-  const [birthday, setBirthday] = useState(profile.birthday ?? '')
+  // Supabase returns `date` as "YYYY-MM-DD"; strip any unexpected timezone suffix
+  // so input type="date" always receives a valid date value or empty string.
+  const [birthday, setBirthday] = useState(
+    profile.birthday ? (profile.birthday.slice(0, 10)) : ''
+  )
   const [formState, setFormState] = useState<UpdateProfileState>(undefined)
   const [pending, startTransition] = useTransition()
 
@@ -155,14 +160,14 @@ export function ProfileForm({ profile, stats }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-8 pb-4">
+    <div className="flex flex-col gap-10 pb-4">
 
       {/* ── Avatar ── */}
       <section className="flex flex-col items-center gap-3 pt-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="relative"
+          className="relative h-16 w-16 overflow-hidden rounded-full"
           disabled={avatarLoading}
           aria-label="Изменить фото"
         >
@@ -171,15 +176,15 @@ export function ProfileForm({ profile, stats }: Props) {
             <img
               src={avatarUrl}
               alt=""
-              className="h-16 w-16 rounded-full object-cover"
+              className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-semibold text-gray-600">
+            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-xl font-semibold text-gray-600">
               {initials}
             </span>
           )}
           {avatarLoading && (
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 text-xs text-white">
+            <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
               ...
             </span>
           )}
@@ -205,6 +210,15 @@ export function ProfileForm({ profile, stats }: Props) {
           className="hidden"
           onChange={handleAvatarChange}
         />
+      </section>
+
+      {/* ── Username — read-only, immutable after registration ── */}
+      <section>
+        <p className="text-sm font-medium text-gray-700">Никнейм</p>
+        <p className="mt-1 text-sm text-gray-900">@{profile.username}</p>
+        <p className="mt-1 text-xs text-gray-400">
+          Никнейм используется для поиска друзей и не может быть изменён.
+        </p>
       </section>
 
       {/* ── Stats ── */}

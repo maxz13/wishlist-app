@@ -18,46 +18,66 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Completed features
 
-- Auth (Supabase email/password, SSR, protected routing)
+- Auth: Supabase email/password, SSR, protected routing
 - Friend system: invite → accept flow, friend wishlist browsing
 - Wishlists: create, edit, visibility toggle (draft vs visible)
 - Wishlist items: add, reserve, reservation owner visibility
 - Birthday collection at registration
-- Home feed ("Лента"): Друзья · Дни рождения · Мои вишлисты · Я подарю sections, overflow links
-- Bottom navigation: icon + label tabs, active state, profile initials badge
-- Profile page: view + edit form (`features/profile/`)
-- Activity feed ("Лента"): new wishlists, new visible items (grouped by wishlist+day), new friends — last 7 days, max 5 events, relative timestamps, fully clickable entities
+- Bottom navigation: icon + label tabs, active state; profile tab shows avatar photo (circular, 24×24, blue border ring when active) or initials badge
+- Home feed ("Лента"): activity stream (top, 4 events, compact single-line rows) + Друзья · Дни рождения · Мои вишлисты · Я подарю sections
+- Activity feed: new wishlists · new visible items (grouped by wishlist+day) · new friends — last 7 days, relative timestamps, all entities clickable
+- Profile page: avatar upload (tap to change, 2 MB limit, JPEG/PNG/WebP), edit name/surname/birthday, stats (friends + wishlists count)
+- Password change: "Безопасность" section, collapsed by default, current-password verification via re-auth, show/hide toggles, min 8 chars
+- Account deletion placeholder: "Появится в следующей версии"
+- App header: shows avatar (h-12 w-12) or initials badge alongside name
+- Username system: chosen at registration, auto-generated from transliterated name+surname (first 3 chars each), editable before submit, immutable after account creation, displayed read-only in profile
 
 ---
 
-## Current unfinished task
+## Current focus
 
-**Avatar upload** — storage infrastructure is now in place (bucket + policies applied). Application-level upload code in `features/profile/` and `app/(app)/profile/page.tsx` has not been tested end-to-end yet. Next step: verify avatar upload works in the running app.
+Approaching V1 release. All core features are functional and tested. Remaining work:
+
+1. **Friend search by username** — search field on `/friends` page, query by `@username`, initiate friend request
+2. **Final Things 3-inspired visual pass** — typography, spacing, card shadows, hierarchy
+3. **Deploy V1** — Vercel production deploy
+
+---
+
+## Migrations (all applied to remote as of 2026-05-31)
+
+| Migration | Description |
+|---|---|
+| 20260528000000 | Initial schema |
+| 20260528000001 | Fix profile trigger |
+| 20260530000000 | Wishlist item visibility (`is_visible` column + updated policies) |
+| 20260530000001 | Profiles reserver visibility policy (fixed ambiguous `id` → `profiles.id`) |
+| 20260530000002 | Birthday on registration (updated `handle_new_user` trigger) |
+| 20260531000000 | Avatars storage bucket + RLS policies |
+| 20260531000001 | Username system: column, format constraint, unique index, `transliterate_ru()`, `generate_username()`, `is_username_available()` RPC, row backfill, updated `handle_new_user` trigger |
 
 ---
 
 ## Important technical decisions
 
 - **Tailwind v4 blue bug:** `bg-blue-500` does not render (CSS variable chain issue). Use `bg-[#3b82f6]` for any blue backgrounds. `text-blue-500` works fine for text.
+- **`bg-[#3b82f6]` dev-server CSS issue:** This class exists only in `bottom-nav.tsx`. Tailwind v4's incremental CSS compiler can intermittently drop it between hot-reloads, making the + button invisible in dev. Production build always includes it (confirmed). If the + button disappears in dev, restart `npm run dev`. Do not "fix" this in code.
+- **Circular avatar pattern:** Always use `overflow-hidden rounded-full` on the wrapper element with explicit `h-* w-*` dimensions, then `h-full w-full object-cover` on the `<img>`. Never put `rounded-full` directly on the img — Tailwind v4 preflight's `img { height: auto }` can cause oval rendering in certain flex contexts.
 - **Storage path convention:** `avatars/{userId}/avatar.jpg` — each user writes only inside their own UUID folder.
-- **Avatars bucket is public** — `getPublicUrl()` returns a direct URL; no expiry management needed. Privacy is enforced via profiles RLS, not bucket access.
-- **Birthday data is NULL for most existing users** — registered before the birthday field was added. Needs profile edit UI or a backfill; currently displayed as empty in the feed.
-- **`migration repair --linked` works without Docker** — useful for fixing migration tracking on remote without a local Supabase setup.
-- **Docker not available in dev environment** — `supabase db diff`, `supabase db dump`, and `supabase db reset` all require Docker and will fail.
+- **Avatars bucket is public** — `getPublicUrl()` returns a direct URL with cache-bust `?v=timestamp`. Privacy enforced via profiles RLS, not bucket access.
+- **Password change uses re-auth, not `current_password` field** — Supabase Cloud does not enforce `UserAttributes.current_password`. Verification is done by calling `signInWithPassword(email, currentPassword)` server-side before `updateUser`. Email is fetched from the session, not the form.
+- **Username is immutable after registration** — no edit UI exists and none should be built. The `profiles.username` column has a UNIQUE constraint and a format CHECK constraint (`^[a-z][a-z0-9_]{1,28}[a-z0-9]$`, no `__`). The profile page shows it read-only with an explanatory note.
+- **Username auto-generation:** `generate_username(name, surname)` DB function transliterates Russian to Latin, takes up to 3 chars from each, appends a numeric counter on collision. The same logic is mirrored in `register-form.tsx` (`buildUsernamePreview`) for the live preview — keep in sync with the SQL.
+- **Activity feed grouping:** `new_items` events group by `(owner_id, wishlist_id, calendar_day)` in JS to prevent spam when a friend adds multiple items at once.
+- **Activity feed timestamps:** `wishlist_items.created_at` = insert time, not publish time. Items drafted then published later carry the draft date. No `published_at` column; acceptable for V1.
+- **`migration repair --linked` works without Docker** — use to fix migration tracking on remote when schema was applied manually.
+- **Docker not available in dev environment** — `supabase db diff`, `supabase db dump`, `supabase db reset` all require Docker and will fail.
+- **Birthday data is NULL for most existing users** — registered before birthday field was added.
+- **Policies inside `20260530000000` may be missing from remote** — the `is_visible` column was applied manually before migration tracking; the policy DROP/CREATE statements may not have run. Verify via Supabase dashboard SQL editor if wishlist visibility behaves incorrectly.
 
 ---
 
 ## Known issues
 
-- Avatar upload infrastructure ready but end-to-end not tested
-- Birthday empty for most existing users (registered before birthday field added)
-- Policies inside `20260530000000` may be missing from remote (column was applied manually; verify via Supabase dashboard SQL editor)
-- Activity feed: `wishlist_items.created_at` reflects insert time, not publish time — items drafted then published later carry stale timestamps (no `published_at` column; acceptable for V1)
-
----
-
-## Next planned tasks
-
-1. Test avatar upload end-to-end on the profile page
-2. Verify `20260530000000` policies are live on remote; apply manually if missing
-3. Build dedicated activity page (`/activity`) for "и ещё N событий" overflow
+- Birthday empty for most existing users (registered before birthday field was added)
+- `20260530000000` policies may be missing from remote (see technical decisions above)

@@ -54,9 +54,20 @@ export default async function FriendsPage() {
                 className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
-                    {friend.name[0]}{friend.surname[0]}
-                  </div>
+                  {friend.avatar_url ? (
+                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={friend.avatar_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
+                      {friend.name[0]}{friend.surname[0]}
+                    </span>
+                  )}
                   <span className="text-sm font-medium">
                     {friend.name} {friend.surname}
                   </span>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-type Props = { initials: string }
+type Props = { initials: string; avatarUrl: string | null }
 
 function HomeIcon() {
   return (
@@ -47,7 +47,7 @@ function PlusIcon() {
   )
 }
 
-export function BottomNav({ initials }: Props) {
+export function BottomNav({ initials, avatarUrl }: Props) {
   const pathname = usePathname()
 
   function isActive(href: string) {
@@ -107,16 +107,30 @@ export function BottomNav({ initials }: Props) {
           <span>Вишлисты</span>
         </Link>
 
-        {/* 5. Профиль — initials badge occupies the same iconBox as other icons */}
+        {/* 5. Профиль */}
         <Link href="/profile" className={tabCls('/profile')}>
-          <span
-            className={
-              iconBox + ' rounded-full text-[10px] font-bold ' +
-              (isActive('/profile') ? 'bg-[#3b82f6] text-white' : 'bg-gray-200 text-gray-500')
-            }
-          >
-            {initials}
-          </span>
+          {avatarUrl ? (
+            <span
+              className={
+                'flex h-6 w-6 shrink-0 overflow-hidden rounded-full ' +
+                (isActive('/profile') ? 'border-2 border-[#3b82f6]' : '')
+              }
+            >
+              {
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              }
+            </span>
+          ) : (
+            <span
+              className={
+                iconBox + ' rounded-full text-[10px] font-bold ' +
+                (isActive('/profile') ? 'bg-[#3b82f6] text-white' : 'bg-gray-200 text-gray-500')
+              }
+            >
+              {initials}
+            </span>
+          )}
           <span>Профиль</span>
         </Link>
 
