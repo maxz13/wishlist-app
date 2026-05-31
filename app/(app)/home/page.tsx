@@ -371,7 +371,12 @@ export default async function HomePage() {
 
         {/* 1. Друзья — compact text rows */}
         <section>
-          <h2 className="mb-2 text-base font-semibold text-gray-900">Друзья</h2>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-gray-900">Друзья</h2>
+            <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
+              Все друзья<span>›</span>
+            </Link>
+          </div>
           {hasFriends ? (
             <>
               <ul className="flex flex-col">
@@ -435,7 +440,12 @@ export default async function HomePage() {
         {/* 3. Мои вишлисты — larger card style */}
         {hasWishlists && (
           <section className="mt-8 sm:mt-10">
-            <h2 className="mb-2 text-base font-semibold text-gray-900">Мои вишлисты</h2>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">Мои вишлисты</h2>
+              <Link href="/wishlists" className="flex items-center gap-1 text-sm text-gray-500">
+                См. все<span>›</span>
+              </Link>
+            </div>
             <ul className="flex flex-col gap-2">
               {displayedWishlists.map((w) => (
                 <li key={w.id}>
