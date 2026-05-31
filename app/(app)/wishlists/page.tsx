@@ -14,14 +14,23 @@ export default async function WishlistsPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data } = await supabase
-    .from('wishlists')
-    .select('id, title, created_at')
-    .eq('owner_id', user!.id)
-    .eq('is_archived', false)
-    .order('created_at', { ascending: false })
+  const [activeResult, archivedResult] = await Promise.all([
+    supabase
+      .from('wishlists')
+      .select('id, title, created_at')
+      .eq('owner_id', user!.id)
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('wishlists')
+      .select('id, title, created_at')
+      .eq('owner_id', user!.id)
+      .eq('is_archived', true)
+      .order('updated_at', { ascending: false }),
+  ])
 
-  const wishlists = (data ?? []) as Wishlist[]
+  const wishlists = (activeResult.data ?? []) as Wishlist[]
+  const archived  = (archivedResult.data ?? []) as Wishlist[]
 
   return (
     <main className="p-4">
@@ -53,6 +62,25 @@ export default async function WishlistsPage() {
       )}
 
       <CreateWishlistSection />
+
+      {archived.length > 0 && (
+        <section className="mt-10">
+          <h2 className="mb-2 text-sm font-medium text-gray-400">Архив</h2>
+          <ul className="flex flex-col gap-1">
+            {archived.map((w) => (
+              <li key={w.id}>
+                <Link
+                  href={`/wishlists/${w.id}`}
+                  className="flex items-center justify-between rounded-xl px-4 py-2.5"
+                >
+                  <p className="text-sm text-gray-400">{w.title}</p>
+                  <span className="text-gray-300">›</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   )
 }

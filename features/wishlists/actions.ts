@@ -282,3 +282,23 @@ export async function unreserveItemAction(
   revalidatePath(`/wishlists/${wishlistId}`)
   return {}
 }
+
+export async function archiveWishlistAction(formData: FormData): Promise<void> {
+  const wishlistId = formData.get('wishlist_id') as string | null
+  if (!wishlistId) return
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('wishlists').update({ is_archived: true }).eq('id', wishlistId)
+  revalidatePath(`/wishlists/${wishlistId}`)
+  revalidatePath('/wishlists')
+  revalidatePath('/home')
+}
+
+export async function restoreWishlistAction(formData: FormData): Promise<void> {
+  const wishlistId = formData.get('wishlist_id') as string | null
+  if (!wishlistId) return
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('wishlists').update({ is_archived: false }).eq('id', wishlistId)
+  revalidatePath(`/wishlists/${wishlistId}`)
+  revalidatePath('/wishlists')
+  revalidatePath('/home')
+}

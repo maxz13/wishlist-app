@@ -8,6 +8,7 @@ import {
   ReservationControls,
   type ReservationState,
 } from '@/features/wishlists/reservation-controls'
+import { archiveWishlistAction, restoreWishlistAction } from '@/features/wishlists/actions'
 
 type WishlistItem = {
   id: string
@@ -34,7 +35,7 @@ export default async function WishlistDetailPage({
 
   const { data: wishlist } = await supabase
     .from('wishlists')
-    .select('id, title, owner_id')
+    .select('id, title, owner_id, is_archived')
     .eq('id', id)
     .single()
 
@@ -196,6 +197,26 @@ export default async function WishlistDetailPage({
               <div className="h-4 w-4 shrink-0 rounded-full bg-gray-300" />
               <span className="text-xs text-gray-400">черновик, скрыт от друзей</span>
             </div>
+          </div>
+        )}
+
+        {isOwner && (
+          <div className="mt-6 border-t border-gray-100 pt-4">
+            {wishlist.is_archived ? (
+              <form action={restoreWishlistAction}>
+                <input type="hidden" name="wishlist_id" value={id} />
+                <button type="submit" className="text-sm text-gray-500">
+                  Восстановить из архива
+                </button>
+              </form>
+            ) : (
+              <form action={archiveWishlistAction}>
+                <input type="hidden" name="wishlist_id" value={id} />
+                <button type="submit" className="text-sm text-gray-400">
+                  Архивировать
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>
