@@ -1,0 +1,434 @@
+'use client'
+
+import { useRef, useState, useTransition } from 'react'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { updateProfileAction, updateAvatarUrlAction, changePasswordAction } from './actions'
+import type { UpdateProfileState, ChangePasswordState } from './actions'
+
+function EyeIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  )
+}
+
+type ProfileData = {
+  id: string
+  name: string
+  surname: string
+  email: string
+  avatar_url: string | null
+  birthday: string | null
+}
+
+type Stats = {
+  friendsCount: number
+  wishlistsCount: number
+}
+
+type Props = {
+  profile: ProfileData
+  stats: Stats
+}
+
+export function ProfileForm({ profile, stats }: Props) {
+  const [name, setName] = useState(profile.name)
+  const [surname, setSurname] = useState(profile.surname)
+  const [birthday, setBirthday] = useState(profile.birthday ?? '')
+  const [formState, setFormState] = useState<UpdateProfileState>(undefined)
+  const [pending, startTransition] = useTransition()
+
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile.avatar_url)
+  const [avatarLoading, setAvatarLoading] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Security — password change
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [passwordState, setPasswordState] = useState<ChangePasswordState>(undefined)
+  const [passwordPending, startPasswordTransition] = useTransition()
+
+  const initials = (
+    (profile.name[0] ?? '') + (profile.surname[0] ?? '')
+  ).toUpperCase()
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setFormState(undefined)
+    const fd = new FormData()
+    fd.set('name', name)
+    fd.set('surname', surname)
+    fd.set('birthday', birthday)
+    startTransition(async () => {
+      const result = await updateProfileAction(undefined, fd)
+      setFormState(result)
+    })
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('Файл слишком большой. Максимальный размер — 2 МБ.')
+      return
+    }
+
+    setAvatarError(null)
+    setAvatarLoading(true)
+
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const path = `${profile.id}/avatar.jpg`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type })
+
+      if (uploadError) throw uploadError
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(path)
+
+      // Cache-bust so the browser fetches the new file immediately
+      const urlWithBust = `${publicUrl}?v=${Date.now()}`
+
+      const result = await updateAvatarUrlAction(urlWithBust)
+      if (result.error) throw new Error(result.error)
+
+      setAvatarUrl(urlWithBust)
+    } catch {
+      setAvatarError('Не удалось загрузить фото. Попробуйте ещё раз.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
+  function handlePasswordSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setPasswordState(undefined)
+    const fd = new FormData()
+    fd.set('currentPassword', currentPassword)
+    fd.set('newPassword', newPassword)
+    fd.set('confirmPassword', confirmPassword)
+    startPasswordTransition(async () => {
+      const result = await changePasswordAction(undefined, fd)
+      setPasswordState(result)
+      if (result?.success) {
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+        setShowCurrent(false)
+        setShowNew(false)
+        setShowConfirm(false)
+      }
+    })
+  }
+
+  function handlePasswordCancel() {
+    setPasswordOpen(false)
+    setPasswordState(undefined)
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setShowCurrent(false)
+    setShowNew(false)
+    setShowConfirm(false)
+  }
+
+  return (
+    <div className="flex flex-col gap-8 pb-4">
+
+      {/* ── Avatar ── */}
+      <section className="flex flex-col items-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="relative"
+          disabled={avatarLoading}
+          aria-label="Изменить фото"
+        >
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-16 w-16 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-semibold text-gray-600">
+              {initials}
+            </span>
+          )}
+          {avatarLoading && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 text-xs text-white">
+              ...
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={avatarLoading}
+          className="text-sm text-[#2563eb] disabled:opacity-50"
+        >
+          {avatarLoading ? 'Загрузка...' : 'Изменить фото'}
+        </button>
+
+        {avatarError && (
+          <p className="text-center text-xs text-red-600">{avatarError}</p>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
+      </section>
+
+      {/* ── Stats ── */}
+      <section>
+        <div className="flex justify-around rounded-xl border border-gray-200 py-4">
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-lg font-semibold text-gray-900">
+              {stats.friendsCount}
+            </span>
+            <span className="text-xs text-gray-500">Друзья</span>
+          </div>
+          <div className="w-px bg-gray-200" />
+          <div className="flex flex-col items-center gap-0.5">
+            <span className="text-lg font-semibold text-gray-900">
+              {stats.wishlistsCount}
+            </span>
+            <span className="text-xs text-gray-500">Вишлисты</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Edit form ── */}
+      <section>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Имя</label>
+            <input
+              name="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+            />
+            {formState?.errors?.name && (
+              <p className="text-xs text-red-600">{formState.errors.name[0]}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">Фамилия</label>
+            <input
+              name="surname"
+              type="text"
+              value={surname}
+              onChange={(e) => setSurname(e.target.value)}
+              required
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+            />
+            {formState?.errors?.surname && (
+              <p className="text-xs text-red-600">{formState.errors.surname[0]}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-gray-700">
+              День рождения
+            </label>
+            <input
+              name="birthday"
+              type="date"
+              value={birthday}
+              onChange={(e) => setBirthday(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Email</label>
+            <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
+              {profile.email}
+            </p>
+            <p className="text-xs text-gray-400">
+              Изменение email появится в следующей версии.
+            </p>
+          </div>
+
+          {formState?.message && !formState.success && (
+            <p className="text-sm text-red-600">{formState.message}</p>
+          )}
+          {formState?.success && (
+            <p className="text-sm text-green-600">Профиль обновлён</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full rounded-xl bg-gray-900 py-3 text-sm font-medium text-white disabled:opacity-40"
+          >
+            {pending ? 'Сохранение...' : 'Сохранить'}
+          </button>
+
+        </form>
+      </section>
+
+      {/* ── Security ── */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900">Безопасность</h2>
+
+        {!passwordOpen ? (
+          <button
+            type="button"
+            onClick={() => setPasswordOpen(true)}
+            className="flex items-center gap-0.5 text-sm text-gray-900"
+          >
+            <span>Сменить пароль</span>
+            <span className="text-gray-400">→</span>
+          </button>
+        ) : (
+          <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
+
+            {/* Current password */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Текущий пароль</label>
+              <div className="relative">
+                <input
+                  type={showCurrent ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent((v) => !v)}
+                  aria-label={showCurrent ? 'Скрыть пароль' : 'Показать пароль'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showCurrent ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {passwordState?.errors?.currentPassword && (
+                <p className="text-xs text-red-600">{passwordState.errors.currentPassword[0]}</p>
+              )}
+            </div>
+
+            {/* New password */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Новый пароль</label>
+              <div className="relative">
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew((v) => !v)}
+                  aria-label={showNew ? 'Скрыть пароль' : 'Показать пароль'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showNew ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {passwordState?.errors?.newPassword && (
+                <p className="text-xs text-red-600">{passwordState.errors.newPassword[0]}</p>
+              )}
+            </div>
+
+            {/* Confirm new password */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">Подтвердите новый пароль</label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  aria-label={showConfirm ? 'Скрыть пароль' : 'Показать пароль'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                >
+                  {showConfirm ? <EyeOffIcon /> : <EyeIcon />}
+                </button>
+              </div>
+              {passwordState?.errors?.confirmPassword && (
+                <p className="text-xs text-red-600">{passwordState.errors.confirmPassword[0]}</p>
+              )}
+            </div>
+
+            {passwordState?.message && (
+              <p className="text-sm text-red-600">{passwordState.message}</p>
+            )}
+            {passwordState?.success && (
+              <p className="text-sm text-green-600">Пароль изменён</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handlePasswordCancel}
+                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-700"
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                disabled={passwordPending}
+                className="flex-1 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {passwordPending ? 'Сохранение...' : 'Изменить'}
+              </button>
+            </div>
+
+          </form>
+        )}
+      </section>
+
+      {/* ── Account deletion placeholder ── */}
+      <section>
+        <p className="text-sm text-gray-400">Удаление аккаунта</p>
+        <p className="mt-0.5 text-xs text-gray-400">Появится в следующей версии</p>
+      </section>
+
+    </div>
+  )
+}

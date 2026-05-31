@@ -19,7 +19,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, name, surname')
+    .select('id, name, surname, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -46,13 +46,27 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-        <div className="min-w-0 flex-1 mr-4">
-          <p className="truncate text-xl font-bold leading-tight text-gray-900">
-            {profile.name}
-          </p>
-          <p className="truncate text-xl font-bold leading-tight text-gray-900">
-            {profile.surname}
-          </p>
+        <div className="flex min-w-0 flex-1 items-center gap-3 mr-4">
+          {profile.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.avatar_url}
+              alt=""
+              className="h-12 w-12 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+              {initials}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-xl font-bold leading-tight text-gray-900">
+              {profile.name}
+            </p>
+            <p className="truncate text-xl font-bold leading-tight text-gray-900">
+              {profile.surname}
+            </p>
+          </div>
         </div>
         <form action={logoutAction}>
           <button type="submit" className="shrink-0 text-sm text-gray-500">

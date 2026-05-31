@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-type Friend = { id: string; name: string; surname: string; birthday: string | null }
-type Wishlist = { id: string; title: string }
+type Friend        = { id: string; name: string; surname: string; birthday: string | null }
+type Friendship    = { friend_id: string; created_at: string }
+type Wishlist      = { id: string; title: string }
 type ReservationRow = {
   reservationId: string
   itemTitle: string
@@ -12,48 +13,92 @@ type ReservationRow = {
 }
 type UpcomingBirthday = { id: string; name: string; daysUntil: number; label: string }
 
+type WishlistActivityRow = {
+  id: string
+  title: string
+  created_at: string
+  profiles: { id: string; name: string; surname: string }
+}
+type ItemActivityRow = {
+  id: string
+  title: string
+  created_at: string
+  wishlist_id: string
+  wishlists: {
+    id: string
+    title: string
+    owner_id: string
+    profiles: { id: string; name: string; surname: string }
+  }
+}
+type ActivityEvent =
+  | { type: 'new_friend';   friendId: string; friendName: string; friendSurname: string; ts: string }
+  | { type: 'new_wishlist'; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_items';    count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+
+// ---- helpers ----------------------------------------------------------------
+
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10  = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
+  return many
+}
+
+function relativeTime(isoString: string): string {
+  const diff  = Date.now() - new Date(isoString).getTime()
+  const mins  = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days  = Math.floor(diff / 86_400_000)
+  if (mins  < 1)   return 'только что'
+  if (mins  < 60)  return `${mins} мин`
+  if (hours < 24)  return `${hours} ч`
+  if (days  === 1) return 'вчера'
+  return `${days} ${pluralRu(days, 'день', 'дня', 'дней')}`
+}
+
 function getDaysUntilBirthday(birthdayIso: string, today: Date): number {
   const [, month, day] = birthdayIso.split('-').map(Number)
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const thisYear = new Date(today.getFullYear(), month - 1, day)
-  const target =
-    thisYear < todayMidnight
-      ? new Date(today.getFullYear() + 1, month - 1, day)
-      : thisYear
+  const todayMidnight  = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const thisYear       = new Date(today.getFullYear(), month - 1, day)
+  const target         = thisYear < todayMidnight
+    ? new Date(today.getFullYear() + 1, month - 1, day)
+    : thisYear
   return Math.round((target.getTime() - todayMidnight.getTime()) / 86_400_000)
 }
 
 function birthdayLabel(daysUntil: number): string {
   if (daysUntil === 0) return 'сегодня 🎉'
-  const mod10 = daysUntil % 10
+  const mod10  = daysUntil % 10
   const mod100 = daysUntil % 100
   let unit: string
-  if (mod10 === 1 && mod100 !== 11) unit = 'день'
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) unit = 'дня'
-  else unit = 'дней'
+  if (mod10 === 1 && mod100 !== 11)                                      unit = 'день'
+  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20))   unit = 'дня'
+  else                                                                   unit = 'дней'
   return `через ${daysUntil} ${unit}`
 }
 
 function moreItemsLabel(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return `и ещё ${n} ${one}`
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `и ещё ${n} ${few}`
-  return `и ещё ${n} ${many}`
+  return `и ещё ${n} ${pluralRu(n, one, few, many)}`
 }
+
+// ---- page -------------------------------------------------------------------
 
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Friendships
-  const { data: friendships } = await supabase
+  const today        = new Date()
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 86_400_000).toISOString()
+
+  // Friendships — include created_at to derive new-friend activity events
+  const { data: friendshipData } = await supabase
     .from('friendships')
-    .select('friend_id')
+    .select('friend_id, created_at')
 
-  const friendIds = (friendships ?? []).map((f) => f.friend_id as string)
+  const friendshipRows = (friendshipData ?? []) as Friendship[]
+  const friendIds      = friendshipRows.map((f) => f.friend_id)
 
   // Own wishlists
   const { data: wishlistsData } = await supabase
@@ -65,7 +110,7 @@ export default async function HomePage() {
 
   const wishlists = (wishlistsData ?? []) as Wishlist[]
 
-  // Friend profiles (names used for both Friends section and Я подарю)
+  // Friend profiles — used for Friends section, Я подарю, and activity events
   let friends: Friend[] = []
   if (friendIds.length > 0) {
     const { data } = await supabase
@@ -76,8 +121,92 @@ export default async function HomePage() {
     friends = (data ?? []) as Friend[]
   }
 
+  const profileById = new Map(friends.map((f) => [f.id, f]))
+
+  // Activity: new wishlists and new visible items by friends, last 7 days
+  const [newWishlistsResult, newItemsResult] = await Promise.all([
+    friendIds.length > 0
+      ? supabase
+          .from('wishlists')
+          .select('id, title, created_at, profiles!inner(id, name, surname)')
+          .in('owner_id', friendIds)
+          .eq('is_archived', false)
+          .gte('created_at', sevenDaysAgo)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] as WishlistActivityRow[] }),
+    supabase
+      .from('wishlist_items')
+      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
+      .eq('is_visible', true)
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false }),
+  ])
+
+  const newWishlistsRaw = (newWishlistsResult.data ?? []) as unknown as WishlistActivityRow[]
+  const newItemsRaw     = ((newItemsResult.data ?? []) as unknown as ItemActivityRow[])
+    .filter((item) => item.wishlists.owner_id !== user!.id)
+
+  // --- Build activity events ---
+
+  // new_friend: friendships formed in last 7 days
+  const newFriendEvents: ActivityEvent[] = friendshipRows
+    .filter((f) => f.created_at >= sevenDaysAgo)
+    .flatMap((f) => {
+      const profile = profileById.get(f.friend_id)
+      if (!profile) return []
+      return [{
+        type: 'new_friend' as const,
+        friendId:      f.friend_id,
+        friendName:    profile.name,
+        friendSurname: profile.surname,
+        ts:            f.created_at,
+      }]
+    })
+
+  // new_wishlist: one event per wishlist created by a friend
+  const newWishlistEvents: ActivityEvent[] = newWishlistsRaw.map((w) => ({
+    type:          'new_wishlist' as const,
+    wishlistId:    w.id,
+    wishlistTitle: w.title,
+    friendId:      w.profiles.id,
+    friendName:    w.profiles.name,
+    ts:            w.created_at,
+  }))
+
+  // new_items: group by (owner_id, wishlist_id, calendar day) to avoid spam
+  // when a friend adds many items to the same wishlist in one sitting.
+  const itemGroupMap = new Map<string, ItemActivityRow[]>()
+  for (const item of newItemsRaw) {
+    const day = new Date(item.created_at).toDateString()
+    const key = `${item.wishlists.owner_id}__${item.wishlist_id}__${day}`
+    if (!itemGroupMap.has(key)) itemGroupMap.set(key, [])
+    itemGroupMap.get(key)!.push(item)
+  }
+  const newItemEvents: ActivityEvent[] = Array.from(itemGroupMap.values()).map((group) => {
+    const first    = group[0]
+    const latestTs = group.reduce(
+      (max, i) => (i.created_at > max ? i.created_at : max),
+      group[0].created_at,
+    )
+    return {
+      type:          'new_items' as const,
+      count:         group.length,
+      singleTitle:   group.length === 1 ? first.title : null,
+      wishlistId:    first.wishlist_id,
+      wishlistTitle: first.wishlists.title,
+      friendId:      first.wishlists.profiles.id,
+      friendName:    first.wishlists.profiles.name,
+      ts:            latestTs,
+    }
+  })
+
+  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents]
+    .sort((a, b) => b.ts.localeCompare(a.ts))
+    .slice(0, 4)
+
+  const hasActivity = displayedEvents.length > 0
+
   // Upcoming birthdays — derived from friends already fetched, no extra query
-  const today = new Date()
   const upcomingBirthdays: UpcomingBirthday[] = friends
     .filter((f): f is Friend & { birthday: string } => f.birthday !== null)
     .map((f) => {
@@ -93,10 +222,7 @@ export default async function HomePage() {
     .select('id, wishlist_item_id')
     .eq('reserved_by_user_id', user!.id)
 
-  const myReservations = (reservationsData ?? []) as Array<{
-    id: string
-    wishlist_item_id: string
-  }>
+  const myReservations = (reservationsData ?? []) as Array<{ id: string; wishlist_item_id: string }>
 
   // Reserved wishlist items
   let reservedItems: Array<{ id: string; title: string; wishlist_id: string }> = []
@@ -121,15 +247,13 @@ export default async function HomePage() {
     itemWishlists = (data ?? []) as typeof itemWishlists
   }
 
-  // Build lookup maps
-  const profileById = new Map(friends.map((f) => [f.id, f]))
-  const itemById = new Map(reservedItems.map((i) => [i.id, i]))
-  const itemWishlistById = new Map(itemWishlists.map((w) => [w.id, w]))
+  const itemById          = new Map(reservedItems.map((i) => [i.id, i]))
+  const itemWishlistById  = new Map(itemWishlists.map((w) => [w.id, w]))
 
   // Compose Я подарю rows — skip items that are drafted/archived/deleted
   const reservationRows = myReservations
     .map((r): ReservationRow | null => {
-      const item = itemById.get(r.wishlist_item_id)
+      const item    = itemById.get(r.wishlist_item_id)
       if (!item) return null
       const wishlist = itemWishlistById.get(item.wishlist_id)
       if (!wishlist) return null
@@ -137,29 +261,27 @@ export default async function HomePage() {
       if (!owner) return null
       return {
         reservationId: r.id,
-        itemTitle: item.title,
-        wishlistId: item.wishlist_id,
-        ownerId: wishlist.owner_id,
-        ownerName: owner.name,
+        itemTitle:     item.title,
+        wishlistId:    item.wishlist_id,
+        ownerId:       wishlist.owner_id,
+        ownerName:     owner.name,
       }
     })
     .filter((row): row is ReservationRow => row !== null)
 
-  const hasFriends = friends.length > 0
-  const hasWishlists = wishlists.length > 0
+  const hasFriends     = friends.length > 0
+  const hasWishlists   = wishlists.length > 0
   const hasReservations = reservationRows.length > 0
 
-  const displayedFriends   = friends.slice(0, 3)
-  const moreFriendsCount   = Math.max(0, friends.length - 3)
-
-  const displayedBirthdays = upcomingBirthdays.slice(0, 3)
-  const moreBirthdaysCount = Math.max(0, upcomingBirthdays.length - 3)
-
+  const displayedFriends    = friends.slice(0, 3)
+  const moreFriendsCount    = Math.max(0, friends.length - 3)
+  const displayedBirthdays  = upcomingBirthdays.slice(0, 3)
+  const moreBirthdaysCount  = Math.max(0, upcomingBirthdays.length - 3)
   const displayedWishlists  = wishlists.slice(0, 3)
   const moreWishlistsCount  = Math.max(0, wishlists.length - 3)
 
-  // State A: nothing to show
-  if (!hasFriends && !hasWishlists && !hasReservations) {
+  // State A: nothing to show at all
+  if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity) {
     return (
       <main className="px-4 pb-10 pt-4">
         <h1 className="text-xl font-semibold">Лента</h1>
@@ -191,7 +313,61 @@ export default async function HomePage() {
     <main className="px-4 pb-10 pt-5">
       <h1 className="text-xl font-semibold">Лента</h1>
 
-      <div className="mt-4 flex flex-col">
+      {/* Activity feed — directly under page title, no redundant section heading */}
+      {hasActivity && (
+        <ul className="mt-4 flex flex-col gap-2">
+          {displayedEvents.map((event, i) => (
+            <li key={i}>
+              <p className="text-sm leading-snug text-gray-900">
+
+                {event.type === 'new_friend' && (<>
+                  <Link href={`/friends/${event.friendId}`} className="font-medium">
+                    {event.friendName} {event.friendSurname}
+                  </Link>
+                  {' теперь в друзьях'}
+                </>)}
+
+                {event.type === 'new_wishlist' && (<>
+                  {'Новый вишлист '}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
+                  {' — '}
+                  <Link href={`/friends/${event.friendId}`} className="font-medium">
+                    {event.friendName}
+                  </Link>
+                </>)}
+
+                {event.type === 'new_items' && event.count === 1 && (<>
+                  {`«${event.singleTitle}» в `}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
+                  {' — '}
+                  <Link href={`/friends/${event.friendId}`} className="font-medium">
+                    {event.friendName}
+                  </Link>
+                </>)}
+
+                {event.type === 'new_items' && event.count > 1 && (<>
+                  {`${event.count} ${pluralRu(event.count, 'новое желание', 'новых желания', 'новых желаний')} в `}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
+                  {' — '}
+                  <Link href={`/friends/${event.friendId}`} className="font-medium">
+                    {event.friendName}
+                  </Link>
+                </>)}
+
+                <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className={`flex flex-col${hasActivity ? ' mt-8 sm:mt-10' : ' mt-4'}`}>
 
         {/* 1. Друзья — compact text rows */}
         <section>
