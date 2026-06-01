@@ -32,6 +32,9 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - App header: shows avatar (h-12 w-12) or initials badge alongside name
 - Username system: chosen at registration, auto-generated from transliterated name+surname (first 3 chars each), editable before submit, immutable after account creation, displayed read-only in profile
 - Wishlist archiving: owner can archive/restore from the wishlist detail page; archived wishlists disappear from the active list and are invisible to friends; shown in a muted "Архив" section at the bottom of the owner's wishlists page; items and reservations are preserved
+- Branding: SimpleWish logo (`public/brand/simplewish-logo.png`) shown on login and register pages above the form; `h-11`, `mb-9`, `pb-[120px]` on `<main>`
+- Font: primary app font is Garet via `next/font/local` (Book=400, Heavy=700); files in `public/fonts/`; Geist Mono retained for `font-mono` usage; body uses `var(--font-garet)`
+- Home section headers: "Друзья" and "Мои вишлисты" have right-side action links ("Все друзья" → `/friends`, "См. все" → `/wishlists`) in a `flex items-center justify-between` row; "Лента" and "Я подарю" have no action links (no destination routes exist)
 
 ---
 
@@ -39,7 +42,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 Approaching V1 release. All core features are functional and tested. Remaining work:
 
-1. **Final Things 3-inspired visual pass** — typography, spacing, card shadows, hierarchy
+1. **Continued visual pass** — remaining screens (home page header, wishlist pages, friends pages)
 2. **Deploy V1** — Vercel production deploy
 
 Friend search by username is deferred to V2.0. The `friend_requests` table and RPCs exist on remote but the UI is not implemented.
@@ -74,6 +77,7 @@ Friend search by username is deferred to V2.0. The `friend_requests` table and R
 - **Username auto-generation:** `generate_username(name, surname)` DB function transliterates Russian to Latin, takes up to 3 chars from each, appends a numeric counter on collision. The same logic is mirrored in `register-form.tsx` (`buildUsernamePreview`) for the live preview — keep in sync with the SQL.
 - **Activity feed grouping:** `new_items` events group by `(owner_id, wishlist_id, calendar_day)` in JS to prevent spam when a friend adds multiple items at once.
 - **Activity feed timestamps:** `wishlist_items.created_at` = insert time, not publish time. Items drafted then published later carry the draft date. No `published_at` column; acceptable for V1.
+- **Font loading:** `next/font/local` with TTF files served directly (no auto WOFF2 conversion). Two weights loaded as one family: `{ path: 'Garet-Book.ttf', weight: '400' }` and `{ path: 'Garet-Heavy.ttf', weight: '700' }`. CSS variable is `--font-garet`. `font-semibold`/`font-bold` resolve to Garet Heavy; `font-normal` resolves to Garet Book.
 - **`migration repair --linked` works without Docker** — use to fix migration tracking on remote when schema was applied manually.
 - **Docker not available in dev environment** — `supabase db diff`, `supabase db dump`, `supabase db reset` all require Docker and will fail.
 - **Birthday data is NULL for most existing users** — registered before birthday field was added.

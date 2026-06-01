@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-import { Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const garet = localFont({
-  src: [
-    { path: "../public/fonts/Garet-Book.ttf",  weight: "400" },
-    { path: "../public/fonts/Garet-Heavy.ttf", weight: "700" },
-  ],
-  variable: "--font-garet",
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-inter",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -29,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${garet.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
