@@ -37,6 +37,35 @@ type Props = {
   profile: ProfileData
 }
 
+function compressImage(file: File, maxDim: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('canvas context failed'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, w, h)
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error('compression failed')),
+        'image/jpeg',
+        quality
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('load failed')) }
+    img.src = url
+  })
+}
+
 export function ProfileForm({ profile }: Props) {
   const [name, setName] = useState(profile.name)
   const [surname, setSurname] = useState(profile.surname)
@@ -85,8 +114,13 @@ export function ProfileForm({ profile }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 2 * 1024 * 1024) {
-      setAvatarError('Файл слишком большой. Максимальный размер — 2 МБ.')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setAvatarError('Можно загрузить только JPG, PNG или WebP.')
+      return
+    }
+
+    if (file.size > 6 * 1024 * 1024) {
+      setAvatarError('Фото должно быть не больше 6 МБ.')
       return
     }
 
@@ -94,12 +128,14 @@ export function ProfileForm({ profile }: Props) {
     setAvatarLoading(true)
 
     try {
+      const compressed = await compressImage(file, 768, 0.85)
+
       const supabase = getSupabaseBrowserClient()
       const path = `${profile.id}/avatar.jpg`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type })
+        .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' })
 
       if (uploadError) throw uploadError
 
@@ -219,57 +255,61 @@ export function ProfileForm({ profile }: Props) {
       <section>
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700">Имя</label>
-            <input
-              name="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
-            />
-            {formState?.errors?.name && (
-              <p className="text-xs text-red-600">{formState.errors.name[0]}</p>
-            )}
-          </div>
+          <div className="grouped-card">
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700">Фамилия</label>
-            <input
-              name="surname"
-              type="text"
-              value={surname}
-              onChange={(e) => setSurname(e.target.value)}
-              required
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
-            />
-            {formState?.errors?.surname && (
-              <p className="text-xs text-red-600">{formState.errors.surname[0]}</p>
-            )}
-          </div>
+            <div className="px-4 py-3">
+              <label className="text-xs font-medium text-gray-500">Имя</label>
+              <input
+                name="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+              />
+              {formState?.errors?.name && (
+                <p className="mt-1 text-xs text-red-600">{formState.errors.name[0]}</p>
+              )}
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-gray-700">
-              День рождения
-            </label>
-            <input
-              name="birthday"
-              type="date"
-              value={birthday}
-              onChange={(e) => setBirthday(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
-            />
-          </div>
+            <div className="h-px bg-[#f3f4f6]" />
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">Email</label>
-            <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
-              {profile.email}
-            </p>
-            <p className="text-xs text-gray-400">
-              Изменение email появится в следующей версии.
-            </p>
+            <div className="px-4 py-3">
+              <label className="text-xs font-medium text-gray-500">Фамилия</label>
+              <input
+                name="surname"
+                type="text"
+                value={surname}
+                onChange={(e) => setSurname(e.target.value)}
+                required
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+              />
+              {formState?.errors?.surname && (
+                <p className="mt-1 text-xs text-red-600">{formState.errors.surname[0]}</p>
+              )}
+            </div>
+
+            <div className="h-px bg-[#f3f4f6]" />
+
+            <div className="px-4 py-3">
+              <label className="text-xs font-medium text-gray-500">День рождения</label>
+              <input
+                name="birthday"
+                type="date"
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+              />
+            </div>
+
+            <div className="h-px bg-[#f3f4f6]" />
+
+            <div className="px-4 py-3">
+              <label className="text-xs font-medium text-gray-500">Email</label>
+              <p className="mt-0.5 text-sm text-gray-900">{profile.email}</p>
+              <p className="mt-0.5 text-xs text-gray-400">Изменение email появится в следующей версии.</p>
+            </div>
+
           </div>
 
           {formState?.message && !formState.success && (
