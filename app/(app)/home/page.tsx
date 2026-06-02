@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { pluralRu, getDaysUntilBirthday, friendBirthdayLine } from '@/lib/format'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
@@ -37,13 +38,6 @@ type ActivityEvent =
 
 // ---- helpers ----------------------------------------------------------------
 
-function pluralRu(n: number, one: string, few: string, many: string): string {
-  const mod10  = n % 10
-  const mod100 = n % 100
-  if (mod10 === 1 && mod100 !== 11) return one
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
-  return many
-}
 
 function relativeTime(isoString: string): string {
   const diff  = Date.now() - new Date(isoString).getTime()
@@ -57,28 +51,8 @@ function relativeTime(isoString: string): string {
   return `${days} ${pluralRu(days, 'день', 'дня', 'дней')}`
 }
 
-function getDaysUntilBirthday(birthdayIso: string, today: Date): number {
-  const [, month, day] = birthdayIso.split('-').map(Number)
-  const todayMidnight  = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const thisYear       = new Date(today.getFullYear(), month - 1, day)
-  const target         = thisYear < todayMidnight
-    ? new Date(today.getFullYear() + 1, month - 1, day)
-    : thisYear
-  return Math.round((target.getTime() - todayMidnight.getTime()) / 86_400_000)
-}
-
-
 function moreItemsLabel(n: number, one: string, few: string, many: string): string {
   return `и ещё ${n} ${pluralRu(n, one, few, many)}`
-}
-
-function friendBirthdayLine(birthdayIso: string, today: Date): string {
-  const daysUntil = getDaysUntilBirthday(birthdayIso, today)
-  if (daysUntil === 0) return 'День рождения сегодня'
-  if (daysUntil <= 10) return `День рождения через ${daysUntil} ${pluralRu(daysUntil, 'день', 'дня', 'дней')}`
-  const [, month, day] = birthdayIso.split('-').map(Number)
-  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
-  return `День рождения ${day} ${months[month - 1]}`
 }
 
 // ---- page -------------------------------------------------------------------
@@ -132,6 +106,19 @@ export default async function HomePage() {
   }
 
   const profileById = new Map(friends.map((f) => [f.id, f]))
+
+  // Active wishlist counts per friend
+  let friendWishlistCountMap = new Map<string, number>()
+  if (friendIds.length > 0) {
+    const { data: counts } = await supabase
+      .from('wishlists')
+      .select('owner_id')
+      .in('owner_id', friendIds)
+      .eq('is_archived', false)
+    for (const row of (counts ?? [])) {
+      friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
+    }
+  }
 
   // Activity: new wishlists and new visible items by friends, last 7 days
   const [newWishlistsResult, newItemsResult] = await Promise.all([
@@ -386,33 +373,38 @@ export default async function HomePage() {
           {hasFriends ? (
             <>
               <ul className="grouped-card">
-                {displayedFriends.map((friend, i) => (
-                  <li key={friend.id}>
-                    {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
-                    <Link
-                      href={`/friends/${friend.id}`}
-                      className="flex items-center gap-3 px-4 py-3"
-                    >
-                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                        {friend.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
-                            {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{friend.name} {friend.surname}</p>
-                        {friend.birthday && (
-                          <p className="text-xs text-gray-400">{friendBirthdayLine(friend.birthday, today)}</p>
-                        )}
-                      </div>
-                      <span className="shrink-0 text-gray-400">›</span>
-                    </Link>
-                  </li>
-                ))}
+                {displayedFriends.map((friend, i) => {
+                  const count = friendWishlistCountMap.get(friend.id) ?? 0
+                  const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
+                  const subline = count === 0
+                    ? birthday
+                    : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${birthday ? ` • ${birthday}` : ''}`
+                  return (
+                    <li key={friend.id}>
+                      {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
+                      <Link
+                        href={`/friends/${friend.id}`}
+                        className="flex items-center gap-3 px-4 py-3"
+                      >
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                          {friend.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
+                              {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900">{friend.name} {friend.surname}</p>
+                          {subline && <p className="text-xs text-gray-400">{subline}</p>}
+                        </div>
+                        <span className="shrink-0 text-gray-400">›</span>
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
               {moreFriendsCount > 0 && (
                 <Link href="/friends" className="mt-2 block py-1 text-sm text-gray-500">
