@@ -71,6 +71,7 @@ export async function registerAction(
     { p_username: username }
   )
   if (rpcError) {
+    console.error('[registerAction] is_username_available error (username=%s):', username, rpcError)
     return { message: `Ошибка регистрации. Попробуйте ещё раз.` }
   }
   if (!usernameAvailable) {
