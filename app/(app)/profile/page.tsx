@@ -10,37 +10,19 @@ export default async function ProfilePage() {
 
   if (!user) redirect('/login')
 
-  const [profileResult, friendsResult, wishlistsResult] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('id, name, surname, email, avatar_url, birthday, username')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('friendships')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
-    supabase
-      .from('wishlists')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_id', user.id)
-      .eq('is_archived', false),
-  ])
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, name, surname, email, avatar_url, birthday, username')
+    .eq('id', user.id)
+    .single()
 
-  const profile = profileResult.data
   if (!profile) redirect('/home')
 
   return (
     <main className="px-4 pb-10 pt-5">
       <h1 className="text-xl font-semibold">Профиль</h1>
       <div className="mt-6">
-        <ProfileForm
-          profile={profile}
-          stats={{
-            friendsCount: friendsResult.count ?? 0,
-            wishlistsCount: wishlistsResult.count ?? 0,
-          }}
-        />
+        <ProfileForm profile={profile} />
       </div>
     </main>
   )

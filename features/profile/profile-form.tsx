@@ -33,17 +33,11 @@ type ProfileData = {
   username: string
 }
 
-type Stats = {
-  friendsCount: number
-  wishlistsCount: number
-}
-
 type Props = {
   profile: ProfileData
-  stats: Stats
 }
 
-export function ProfileForm({ profile, stats }: Props) {
+export function ProfileForm({ profile }: Props) {
   const [name, setName] = useState(profile.name)
   const [surname, setSurname] = useState(profile.surname)
   // Supabase returns `date` as "YYYY-MM-DD"; strip any unexpected timezone suffix
@@ -219,25 +213,6 @@ export function ProfileForm({ profile, stats }: Props) {
         <p className="mt-1 text-xs text-gray-400">
           Никнейм используется для поиска друзей и не может быть изменён.
         </p>
-      </section>
-
-      {/* ── Stats ── */}
-      <section>
-        <div className="flex justify-around rounded-xl border border-gray-200 py-4">
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-lg font-semibold text-gray-900">
-              {stats.friendsCount}
-            </span>
-            <span className="text-xs text-gray-500">Друзья</span>
-          </div>
-          <div className="w-px bg-gray-200" />
-          <div className="flex flex-col items-center gap-0.5">
-            <span className="text-lg font-semibold text-gray-900">
-              {stats.wishlistsCount}
-            </span>
-            <span className="text-xs text-gray-500">Вишлисты</span>
-          </div>
-        </div>
       </section>
 
       {/* ── Edit form ── */}

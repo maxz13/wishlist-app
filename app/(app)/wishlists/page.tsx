@@ -97,12 +97,13 @@ export default async function WishlistsPage() {
       {archived.length > 0 && (
         <section className="mt-10">
           <h2 className="mb-2 text-sm font-medium text-gray-400">Архив</h2>
-          <ul className="flex flex-col gap-1">
-            {archived.map((w) => (
+          <ul className="grouped-card">
+            {archived.map((w, i) => (
               <li key={w.id}>
+                {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
                 <Link
                   href={`/wishlists/${w.id}`}
-                  className="flex items-center justify-between rounded-xl px-4 py-2.5"
+                  className="flex items-center justify-between px-4 py-2.5"
                 >
                   <p className="text-sm text-gray-400">{w.title}</p>
                   <span className="text-gray-300">›</span>

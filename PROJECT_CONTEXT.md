@@ -24,18 +24,22 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Wishlist items: add, reserve, reservation owner visibility
 - Birthday collection at registration
 - Bottom navigation: icon + label tabs, active state; profile tab shows avatar photo (circular, 24×24, blue border ring when active) or initials badge
-- Home feed ("Лента"): activity stream (top, 4 events, compact single-line rows) + Друзья · Дни рождения · Мои вишлисты · Я подарю sections
-- Activity feed: new wishlists · new visible items (grouped by wishlist+day) · new friends — last 7 days, relative timestamps, all entities clickable; items wrapped in a grouped card with light-blue bullets and centered 90%-width dividers between rows
-- Profile page: avatar upload (tap to change, 2 MB limit, JPEG/PNG/WebP), edit name/surname/birthday, stats (friends + wishlists count)
+- Home feed ("Лента"): activity stream (top, 4 events) + Друзья · Мои вишлисты · Я подарю sections. "Дни рождения" section was removed from Home.
+- Activity feed: new wishlists · new visible items (grouped by wishlist+day) · new friends — last 7 days, relative timestamps, all entities clickable; wrapped in `.grouped-card` with `.feed-bullet` (light-blue 8×8 circle) per row and `.grouped-card-divider` (90% centered) between rows
+- Friends section (Home): `.grouped-card` with circular avatar (h-10 w-10, safe wrapper pattern), name+surname, birthday line below name (`friendBirthdayLine`: "через N дней" if ≤10 days, "DD месяц" otherwise), `ml-[68px]` divider starting after avatar area
+- My Wishlists section (Home): `.grouped-card` with title + item count below (`N желание/желания/желаний`), numeric count before `›` on right, full-width `h-px bg-[#f3f4f6]` dividers between rows
+- Я подарю section (Home): `.grouped-card` with gift title on first line, `Для {ownerName}` on second line (`text-xs text-gray-400`), `›` on right, full-width dividers
+- Profile page: avatar upload (tap to change, 2 MB limit, JPEG/PNG/WebP), large circular avatar `h-32 w-32` with `text-4xl` initials fallback, edit name/surname/birthday, stats (friends + wishlists count)
 - Password change: "Безопасность" section, collapsed by default, current-password verification via re-auth, show/hide toggles, min 8 chars
 - Account deletion placeholder: "Появится в следующей версии"
-- App header (app/(app)/layout.tsx): avatar h-14 w-14, full name on one line, @username on second line in muted gray (text-gray-400), no bottom border/divider; shows on all app pages
+- App header (`app/(app)/layout.tsx`): avatar `h-16 w-16`, full name on one line (wraps naturally), `@username` on second line in `text-gray-400`, no bottom border/divider; shows on all app pages
 - Username system: chosen at registration, auto-generated from transliterated name+surname (first 3 chars each), editable before submit, immutable after account creation, displayed read-only in profile and in app header
-- Wishlist archiving: owner can archive/restore from the wishlist detail page; archived wishlists disappear from the active list and are invisible to friends; shown in a muted "Архив" section at the bottom of the owner's wishlists page; items and reservations are preserved
+- Wishlist archiving: owner can archive/restore from wishlist detail page; archived wishlists invisible to friends; shown in muted "Архив" section (`text-sm font-medium text-gray-400`) at bottom of wishlists page; items and reservations preserved
+- Wishlists page (`/wishlists`): `section-title` on `<h1>`, active wishlists in `.grouped-card` with item counts and full-width dividers (same pattern as Home); archive section intentionally unstyled (muted label, no card)
 - Branding: SimpleWish logo (`public/brand/simplewish-logo.png`) shown on login and register pages above the form; `h-11`, `mb-9`, `pb-[120px]` on `<main>`
-- Font: primary app font is Inter via `next/font/google` (subsets: latin + cyrillic); CSS variable is `--font-inter`; Geist Mono retained for `font-mono` usage; body uses `var(--font-inter), sans-serif`
-- Home section headers: "Друзья" and "Мои вишлисты" have right-side action links ("Все друзья" → `/friends`, "См. все" → `/wishlists`) in a `flex items-center justify-between` row; "Лента" and "Я подарю" have no action links (no destination routes exist)
-- Design system CSS classes in `app/globals.css`: `.grouped-card` (white card with border + shadow), `.feed-bullet` (8×8 light-blue circle), `.grouped-card-divider` (1px, 90% width, centered, #f3f4f6)
+- Font: primary app font is Inter via `next/font/google` (subsets: latin + cyrillic); CSS variable `--font-inter`; Geist Mono retained for `font-mono` usage; body uses `var(--font-inter), sans-serif`
+- Section headers: all major section/page headings use `.section-title` CSS class (1.0625rem / semibold / #111827). Applied to: Друзья, Мои вишлисты, Я подарю (Home), Вишлисты (page h1). "Лента" not yet migrated. Subsection titles (Безопасность, Пригласить друга, Новый вишлист) intentionally excluded.
+- Design system CSS classes in `app/globals.css`: `.section-title` (1.0625rem, 600, #111827), `.grouped-card` (white card, border #f3f4f6, radius 16px, shadow), `.feed-bullet` (8×8 light-blue #93c5fd circle), `.grouped-card-divider` (1px, 90% width, centered, #f3f4f6)
 
 ---
 
@@ -43,9 +47,8 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 Approaching V1 release. All core features are functional and tested. Remaining work:
 
-1. **Continued visual pass** — remaining screens (wishlist pages, friends pages)
-2. **Apply design system classes** — activity feed card (`<ul>`) and bullet (`<span>`) still use arbitrary Tailwind classes (`rounded-[16px]`, `shadow-[...]`, `h-[8px]`, `w-[8px]`, `bg-[#93c5fd]`); `.grouped-card` and `.feed-bullet` from globals.css are ready to replace them but not yet applied
-3. **Deploy V1** — Vercel production deploy
+1. **Continued visual pass** — friends page, wishlist detail page, friend detail page
+2. **Deploy V1** — Vercel production deploy
 
 Friend search by username is deferred to V2.0. The `friend_requests` table and RPCs exist on remote but the UI is not implemented.
 
@@ -81,6 +84,8 @@ Friend search by username is deferred to V2.0. The `friend_requests` table and R
 - **Activity feed grouping:** `new_items` events group by `(owner_id, wishlist_id, calendar_day)` in JS to prevent spam when a friend adds multiple items at once.
 - **Activity feed timestamps:** `wishlist_items.created_at` = insert time, not publish time. Items drafted then published later carry the draft date. No `published_at` column; acceptable for V1.
 - **Font loading:** `next/font/google` with Inter, subsets `['latin', 'cyrillic']`, CSS variable `--font-inter`, `display: 'swap'`. Geist Mono loaded separately for `font-mono`. Body uses `var(--font-inter), sans-serif` in globals.css and `--font-sans: var(--font-inter)` in the Tailwind `@theme` block.
+- **Item count pattern:** both Home and Wishlists pages fetch item counts via a separate query: `select('wishlist_id').in('wishlist_id', ids)` then build a `Map<string, number>` client-side. This logic is duplicated — refactor to a shared helper is deferred. Count is total items per wishlist (no `is_visible` filter) since the owner sees all their own items.
+- **Wishlist divider pattern:** activity feed uses `.grouped-card-divider` (90% centered); friends rows use `ml-[68px] h-px bg-[#f3f4f6]` (offset after avatar); wishlists and Я подарю rows use `h-px bg-[#f3f4f6]` (full-width). Each pattern is intentional for its context.
 - **`migration repair --linked` works without Docker** — use to fix migration tracking on remote when schema was applied manually.
 - **Docker not available in dev environment** — `supabase db diff`, `supabase db dump`, `supabase db reset` all require Docker and will fail.
 - **Birthday data is NULL for most existing users** — registered before birthday field was added.
@@ -92,4 +97,4 @@ Friend search by username is deferred to V2.0. The `friend_requests` table and R
 
 - Birthday empty for most existing users (registered before birthday field was added)
 - `20260530000000` policies may be missing from remote (see technical decisions above)
-- Activity feed card (`<ul>`) and bullet (`<span>`) still use arbitrary Tailwind classes; `.grouped-card` and `.feed-bullet` from globals.css are ready to replace them
+- `<h1>Лента</h1>` on Home page still uses `text-xl font-semibold` directly instead of `.section-title` — deferred
