@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-type Friend        = { id: string; name: string; surname: string; birthday: string | null }
+type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
 type Wishlist      = { id: string; title: string }
 type ReservationRow = {
@@ -83,6 +83,15 @@ function moreItemsLabel(n: number, one: string, few: string, many: string): stri
   return `и ещё ${n} ${pluralRu(n, one, few, many)}`
 }
 
+function friendBirthdayLine(birthdayIso: string, today: Date): string {
+  const daysUntil = getDaysUntilBirthday(birthdayIso, today)
+  if (daysUntil === 0) return 'День рождения сегодня'
+  if (daysUntil <= 10) return `День рождения через ${daysUntil} ${pluralRu(daysUntil, 'день', 'дня', 'дней')}`
+  const [, month, day] = birthdayIso.split('-').map(Number)
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
+  return `День рождения ${day} ${months[month - 1]}`
+}
+
 // ---- page -------------------------------------------------------------------
 
 export default async function HomePage() {
@@ -115,7 +124,7 @@ export default async function HomePage() {
   if (friendIds.length > 0) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, surname, birthday')
+      .select('id, name, surname, birthday, avatar_url')
       .in('id', friendIds)
       .order('name')
     friends = (data ?? []) as Friend[]
@@ -315,7 +324,7 @@ export default async function HomePage() {
 
       {/* Activity feed — directly under page title, no redundant section heading */}
       {hasActivity && (
-        <ul className="mt-4 rounded-[16px] border border-[#f3f4f6] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.08)]">
+        <ul className="mt-4 grouped-card">
           {displayedEvents.map((event, i) => (
             <li key={i}>
               {i > 0 && (
@@ -324,7 +333,7 @@ export default async function HomePage() {
                 </div>
               )}
               <div className="flex items-start gap-3 px-4 py-3">
-              <span className="mt-1 h-[8px] w-[8px] shrink-0 rounded-full bg-[#93c5fd]" />
+              <span className="mt-1 feed-bullet" />
               <p className="text-sm leading-snug text-gray-900">
 
                 {event.type === 'new_friend' && (<>
@@ -377,33 +386,47 @@ export default async function HomePage() {
 
       <div className={`flex flex-col${hasActivity ? ' mt-8 sm:mt-10' : ' mt-4'}`}>
 
-        {/* 1. Друзья — compact text rows */}
+        {/* 1. Друзья */}
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Друзья</h2>
+            <h2 className="section-title">Друзья</h2>
             <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
               Все друзья<span>›</span>
             </Link>
           </div>
           {hasFriends ? (
             <>
-              <ul className="flex flex-col">
-                {displayedFriends.map((friend) => (
+              <ul className="grouped-card">
+                {displayedFriends.map((friend, i) => (
                   <li key={friend.id}>
+                    {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
                     <Link
                       href={`/friends/${friend.id}`}
-                      className="flex items-center gap-0.5 py-1"
+                      className="flex items-center gap-3 px-4 py-3"
                     >
-                      <span className="text-sm text-gray-900">
-                        {friend.name} {friend.surname}
-                      </span>
-                      <span className="text-sm text-gray-400">→</span>
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                        {friend.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
+                            {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900">{friend.name} {friend.surname}</p>
+                        {friend.birthday && (
+                          <p className="text-xs text-gray-400">{friendBirthdayLine(friend.birthday, today)}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-gray-400">›</span>
                     </Link>
                   </li>
                 ))}
               </ul>
               {moreFriendsCount > 0 && (
-                <Link href="/friends" className="block py-1 text-sm text-gray-500">
+                <Link href="/friends" className="mt-2 block py-1 text-sm text-gray-500">
                   {moreItemsLabel(moreFriendsCount, 'друг', 'друга', 'друзей')}
                 </Link>
               )}
@@ -421,7 +444,7 @@ export default async function HomePage() {
         {/* 2. Дни рождения */}
         {upcomingBirthdays.length > 0 && (
           <section className="mt-8 sm:mt-10">
-            <h2 className="mb-2 text-base font-semibold text-gray-900">Дни рождения</h2>
+            <h2 className="mb-2 section-title">Дни рождения</h2>
             <ul className="flex flex-col">
               {displayedBirthdays.map((entry) => (
                 <li key={entry.id}>
@@ -449,7 +472,7 @@ export default async function HomePage() {
         {hasWishlists && (
           <section className="mt-8 sm:mt-10">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">Мои вишлисты</h2>
+              <h2 className="section-title">Мои вишлисты</h2>
               <Link href="/wishlists" className="flex items-center gap-1 text-sm text-gray-500">
                 См. все<span>›</span>
               </Link>
@@ -488,7 +511,7 @@ export default async function HomePage() {
         {/* 4. Я подарю — compact text rows */}
         {hasReservations && (
           <section className="mt-8 sm:mt-10">
-            <h2 className="mb-2 text-base font-semibold text-gray-900">Я подарю</h2>
+            <h2 className="mb-2 section-title">Я подарю</h2>
             <ul className="flex flex-col">
               {reservationRows.map((row) => (
                 <li key={row.reservationId}>
