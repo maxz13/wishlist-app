@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logoutAction } from '@/features/auth/actions'
 import { BottomNav } from './bottom-nav'
+import { LogOut } from 'lucide-react'
 
 export default async function AppLayout({
   children,
@@ -69,8 +70,8 @@ export default async function AppLayout({
           </div>
         </div>
         <form action={logoutAction}>
-          <button type="submit" className="shrink-0 text-sm text-gray-500">
-            Выйти
+          <button type="submit" aria-label="Выйти" className="shrink-0 text-gray-500">
+            <LogOut size={18} />
           </button>
         </form>
       </header>
