@@ -8,6 +8,14 @@ type Wishlist = {
   created_at: string
 }
 
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10  = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
+  return many
+}
+
 export default async function WishlistsPage() {
   const supabase = await createServerSupabaseClient()
   const {
@@ -32,9 +40,20 @@ export default async function WishlistsPage() {
   const wishlists = (activeResult.data ?? []) as Wishlist[]
   const archived  = (archivedResult.data ?? []) as Wishlist[]
 
+  let itemCountMap = new Map<string, number>()
+  if (wishlists.length > 0) {
+    const { data: counts } = await supabase
+      .from('wishlist_items')
+      .select('wishlist_id')
+      .in('wishlist_id', wishlists.map(w => w.id))
+    for (const row of (counts ?? [])) {
+      itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
+    }
+  }
+
   return (
     <main className="p-4">
-      <h1 className="text-xl font-semibold">Вишлисты</h1>
+      <h1 className="section-title">Вишлисты</h1>
 
       {wishlists.length === 0 ? (
         <div className="mt-10 flex flex-col items-center gap-2 text-center">
@@ -46,18 +65,30 @@ export default async function WishlistsPage() {
           </p>
         </div>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2">
-          {wishlists.map((w) => (
-            <li key={w.id}>
-              <Link
-                href={`/wishlists/${w.id}`}
-                className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
-              >
-                <p className="text-sm font-medium text-gray-900">{w.title}</p>
-                <span className="text-gray-400">›</span>
-              </Link>
-            </li>
-          ))}
+        <ul className="mt-4 grouped-card">
+          {wishlists.map((w, i) => {
+            const count = itemCountMap.get(w.id) ?? 0
+            return (
+              <li key={w.id}>
+                {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                <Link
+                  href={`/wishlists/${w.id}`}
+                  className="flex items-center justify-between px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {count} {pluralRu(count, 'желание', 'желания', 'желаний')}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 text-gray-400">
+                    <span className="text-xs">{count}</span>
+                    <span>›</span>
+                  </div>
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
 

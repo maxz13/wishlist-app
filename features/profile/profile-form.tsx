@@ -167,7 +167,7 @@ export function ProfileForm({ profile, stats }: Props) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="relative h-16 w-16 overflow-hidden rounded-full"
+          className="relative h-32 w-32 overflow-hidden rounded-full"
           disabled={avatarLoading}
           aria-label="Изменить фото"
         >
@@ -179,7 +179,7 @@ export function ProfileForm({ profile, stats }: Props) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-xl font-semibold text-gray-600">
+            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-4xl font-semibold text-gray-600">
               {initials}
             </span>
           )}

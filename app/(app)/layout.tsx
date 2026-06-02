@@ -52,10 +52,10 @@ export default async function AppLayout({
             <img
               src={profile.avatar_url}
               alt=""
-              className="h-14 w-14 shrink-0 rounded-full object-cover"
+              className="h-16 w-16 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
               {initials}
             </span>
           )}

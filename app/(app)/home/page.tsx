@@ -11,7 +11,6 @@ type ReservationRow = {
   ownerId: string
   ownerName: string
 }
-type UpcomingBirthday = { id: string; name: string; daysUntil: number; label: string }
 
 type WishlistActivityRow = {
   id: string
@@ -68,16 +67,6 @@ function getDaysUntilBirthday(birthdayIso: string, today: Date): number {
   return Math.round((target.getTime() - todayMidnight.getTime()) / 86_400_000)
 }
 
-function birthdayLabel(daysUntil: number): string {
-  if (daysUntil === 0) return 'сегодня 🎉'
-  const mod10  = daysUntil % 10
-  const mod100 = daysUntil % 100
-  let unit: string
-  if (mod10 === 1 && mod100 !== 11)                                      unit = 'день'
-  else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20))   unit = 'дня'
-  else                                                                   unit = 'дней'
-  return `через ${daysUntil} ${unit}`
-}
 
 function moreItemsLabel(n: number, one: string, few: string, many: string): string {
   return `и ещё ${n} ${pluralRu(n, one, few, many)}`
@@ -118,6 +107,18 @@ export default async function HomePage() {
     .order('created_at', { ascending: false })
 
   const wishlists = (wishlistsData ?? []) as Wishlist[]
+
+  // Item counts for own wishlists
+  let itemCountMap = new Map<string, number>()
+  if (wishlists.length > 0) {
+    const { data: counts } = await supabase
+      .from('wishlist_items')
+      .select('wishlist_id')
+      .in('wishlist_id', wishlists.map(w => w.id))
+    for (const row of (counts ?? [])) {
+      itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
+    }
+  }
 
   // Friend profiles — used for Friends section, Я подарю, and activity events
   let friends: Friend[] = []
@@ -215,16 +216,6 @@ export default async function HomePage() {
 
   const hasActivity = displayedEvents.length > 0
 
-  // Upcoming birthdays — derived from friends already fetched, no extra query
-  const upcomingBirthdays: UpcomingBirthday[] = friends
-    .filter((f): f is Friend & { birthday: string } => f.birthday !== null)
-    .map((f) => {
-      const daysUntil = getDaysUntilBirthday(f.birthday, today)
-      return { id: f.id, name: f.name, daysUntil, label: birthdayLabel(daysUntil) }
-    })
-    .filter((entry) => entry.daysUntil <= 30)
-    .sort((a, b) => a.daysUntil - b.daysUntil)
-
   // My reservations
   const { data: reservationsData } = await supabase
     .from('reservations')
@@ -284,8 +275,6 @@ export default async function HomePage() {
 
   const displayedFriends    = friends.slice(0, 3)
   const moreFriendsCount    = Math.max(0, friends.length - 3)
-  const displayedBirthdays  = upcomingBirthdays.slice(0, 3)
-  const moreBirthdaysCount  = Math.max(0, upcomingBirthdays.length - 3)
   const displayedWishlists  = wishlists.slice(0, 3)
   const moreWishlistsCount  = Math.max(0, wishlists.length - 3)
 
@@ -441,34 +430,7 @@ export default async function HomePage() {
           )}
         </section>
 
-        {/* 2. Дни рождения */}
-        {upcomingBirthdays.length > 0 && (
-          <section className="mt-8 sm:mt-10">
-            <h2 className="mb-2 section-title">Дни рождения</h2>
-            <ul className="flex flex-col">
-              {displayedBirthdays.map((entry) => (
-                <li key={entry.id}>
-                  <Link
-                    href={`/friends/${entry.id}`}
-                    className="flex items-center gap-0.5 py-1"
-                  >
-                    <span className="text-sm text-gray-900">
-                      {entry.name} — {entry.label}
-                    </span>
-                    <span className="text-sm text-gray-400">→</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {moreBirthdaysCount > 0 && (
-              <Link href="/friends" className="block py-1 text-sm text-gray-500">
-                {moreItemsLabel(moreBirthdaysCount, 'день рождения', 'дня рождения', 'дней рождения')}
-              </Link>
-            )}
-          </section>
-        )}
-
-        {/* 3. Мои вишлисты — larger card style */}
+        {/* 2. Мои вишлисты */}
         {hasWishlists && (
           <section className="mt-8 sm:mt-10">
             <div className="mb-2 flex items-center justify-between">
@@ -477,21 +439,33 @@ export default async function HomePage() {
                 См. все<span>›</span>
               </Link>
             </div>
-            <ul className="flex flex-col gap-2">
-              {displayedWishlists.map((w) => (
-                <li key={w.id}>
-                  <Link
-                    href={`/wishlists/${w.id}`}
-                    className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
-                  >
-                    <p className="text-sm font-medium text-gray-900">{w.title}</p>
-                    <span className="text-gray-400">›</span>
-                  </Link>
-                </li>
-              ))}
+            <ul className="grouped-card">
+              {displayedWishlists.map((w, i) => {
+                const count = itemCountMap.get(w.id) ?? 0
+                return (
+                  <li key={w.id}>
+                    {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                    <Link
+                      href={`/wishlists/${w.id}`}
+                      className="flex items-center justify-between px-4 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                        <p className="text-xs text-gray-400">
+                          {count} {pluralRu(count, 'желание', 'желания', 'желаний')}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1 text-gray-400">
+                        <span className="text-xs">{count}</span>
+                        <span>›</span>
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
             </ul>
             {moreWishlistsCount > 0 && (
-              <Link href="/wishlists" className="mt-1 block py-1 text-sm text-gray-500">
+              <Link href="/wishlists" className="mt-2 block py-1 text-sm text-gray-500">
                 {moreItemsLabel(moreWishlistsCount, 'вишлист', 'вишлиста', 'вишлистов')}
               </Link>
             )}
@@ -508,21 +482,27 @@ export default async function HomePage() {
           </Link>
         )}
 
-        {/* 4. Я подарю — compact text rows */}
+        {/* 3. Я подарю */}
         {hasReservations && (
           <section className="mt-8 sm:mt-10">
             <h2 className="mb-2 section-title">Я подарю</h2>
-            <ul className="flex flex-col">
-              {reservationRows.map((row) => (
+            <ul className="grouped-card">
+              {reservationRows.map((row, i) => (
                 <li key={row.reservationId}>
+                  {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
                   <Link
                     href={`/wishlists/${row.wishlistId}?fromFriend=${row.ownerId}`}
-                    className="flex min-w-0 items-center gap-0.5 py-1"
+                    className="flex min-w-0 items-center justify-between px-4 py-3"
                   >
-                    <span className="truncate text-sm text-gray-900">
-                      {row.itemTitle} — {row.ownerName}
-                    </span>
-                    <span className="shrink-0 text-sm text-gray-400">→</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">
+                        {row.itemTitle}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Для {row.ownerName}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-gray-400">›</span>
                   </Link>
                 </li>
               ))}
