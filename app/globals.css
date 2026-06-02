@@ -24,3 +24,26 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), sans-serif;
 }
+
+.grouped-card {
+  background-color: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.feed-bullet {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background-color: #93c5fd;
+  flex-shrink: 0;
+}
+
+.grouped-card-divider {
+  height: 1px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #f3f4f6;
+}

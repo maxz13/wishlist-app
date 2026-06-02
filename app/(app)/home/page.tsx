@@ -315,9 +315,16 @@ export default async function HomePage() {
 
       {/* Activity feed — directly under page title, no redundant section heading */}
       {hasActivity && (
-        <ul className="mt-4 flex flex-col gap-2">
+        <ul className="mt-4 rounded-[16px] border border-[#f3f4f6] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.10),0_1px_2px_rgba(0,0,0,0.08)]">
           {displayedEvents.map((event, i) => (
             <li key={i}>
+              {i > 0 && (
+                <div className="flex justify-center">
+                  <div className="grouped-card-divider" />
+                </div>
+              )}
+              <div className="flex items-start gap-3 px-4 py-3">
+              <span className="mt-1 h-[8px] w-[8px] shrink-0 rounded-full bg-[#93c5fd]" />
               <p className="text-sm leading-snug text-gray-900">
 
                 {event.type === 'new_friend' && (<>
@@ -362,6 +369,7 @@ export default async function HomePage() {
 
                 <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
               </p>
+              </div>
             </li>
           ))}
         </ul>
