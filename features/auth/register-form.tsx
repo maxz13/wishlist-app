@@ -105,7 +105,7 @@ export function RegisterForm({ next }: { next?: string }) {
             id="username"
             name="username"
             type="text"
-            autoComplete="username"
+            autoComplete="nickname"
             required
             value={usernameValue}
             onChange={(e) => {
@@ -147,7 +147,7 @@ export function RegisterForm({ next }: { next?: string }) {
           id="email"
           name="email"
           type="email"
-          autoComplete="email"
+          autoComplete="email username"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
