@@ -31,7 +31,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
 - My Wishlists section (Home): `.grouped-card`, title + item count below, numeric count before `›`, full-width dividers
 - Я подарю section (Home): `.grouped-card`, gift title line 1, `Для {ownerName}` line 2, `›`, full-width dividers
-- Profile page: avatar upload (2 MB, JPEG/PNG/WebP), `h-32 w-32` avatar with `text-4xl` initials fallback, edit name/surname/birthday. Stats block removed.
+- Profile page: avatar upload with client-side Canvas compression (max 6 MB input, resized to max 768×768, JPEG 0.85 quality, MIME validation); avatar removal ("Удалить фото" — deletes from storage + sets avatar_url null, ignores not-found errors); fields (name, surname, birthday, email) in `grouped-card` with transparent inputs; `h-32 w-32` avatar with `text-4xl` initials fallback. Stats block removed.
 - Password change: "Безопасность" section, collapsed by default, current-password re-auth, show/hide toggles, min 8 chars
 - Account deletion placeholder: "Появится в следующей версии"
 - App header (`app/(app)/layout.tsx`): avatar `h-16 w-16`, full name on one line, `@username` second line in `text-gray-400`, logout icon (`LogOut` from `lucide-react`, size 18, `aria-label="Выйти"`), no bottom border; shown on all app pages
@@ -41,17 +41,20 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Branding: SimpleWish logo (`public/brand/simplewish-logo.png`) on login/register; `h-11 mb-9`
 - Font: Inter via `next/font/google` (latin + cyrillic); `--font-inter`; Geist Mono for `font-mono`
 - Section headers: `.section-title` (1.0625rem / 600 / #111827) on all major headings. "Лента" not yet migrated.
-- Design system CSS (`app/globals.css`): `.section-title`, `.grouped-card`, `.feed-bullet`, `.grouped-card-divider`
+- Design system CSS (`app/globals.css`): `.section-title`, `.grouped-card`, `.feed-bullet`, `.grouped-card-divider`, `font-size: 16px !important` on all inputs/textarea/select (mobile zoom prevention)
+- Mobile PWA: viewport export in `app/layout.tsx` sets `maximumScale: 1, userScalable: false` — **this is what prevents Safari input zoom**; `bg-white` on both `html` and `body` prevents gray background on overscroll
 
 ---
 
 ## Current focus
 
-V1 deployed to production. Active issue: **registration broken** (see Known Issues).
+V1 deployed to production. Core issue resolved: registration and Safari zoom fixed. Incoming friend requests now display correctly on the Friends page.
 
-Remaining work after registration fix:
-1. Visual pass — wishlist detail page, friend detail page
-2. Remove debug logging from `registerAction` once production registration is confirmed working
+Remaining work:
+1. Apply pending migrations to remote (see Migrations table)
+2. Remove debug logging from `registerAction` once production registration confirmed working
+3. Visual pass — wishlist detail page, friend detail page
+4. Update `app/layout.tsx` metadata from stale CNA defaults to "SimpleWish"
 
 ---
 
@@ -81,6 +84,9 @@ Remaining work after registration fix:
 - **Circular avatar pattern:** `overflow-hidden rounded-full` on wrapper + explicit `h-* w-*`; `h-full w-full object-cover` on `<img>`. Never `rounded-full` on `<img>`.
 - **Storage path:** `avatars/{userId}/avatar.jpg`.
 - **Avatars bucket is public** — `getPublicUrl()` + `?v=timestamp`. Privacy via profiles RLS.
+- **Avatar compression:** client-side Canvas API in `profile-form.tsx`. Validates MIME (JPEG/PNG/WebP), rejects >6 MB, resizes to max 768px, encodes as JPEG at 0.85 quality before upload.
+- **Avatar removal:** `removeAvatarAction()` in `features/profile/actions.ts`. Deletes storage file, ignores "not found" errors, sets `avatar_url = null`, revalidates `/profile` and `/home`.
+- **Safari input zoom fix:** `export const viewport = { maximumScale: 1, userScalable: false }` in `app/layout.tsx`. This is the actual fix — confirmed via investigation. The `font-size: 16px !important` rule in `globals.css` is a belt-and-suspenders backup but the viewport export is the root fix.
 - **Password change uses re-auth** — `signInWithPassword` server-side before `updateUser`.
 - **Username is immutable after registration.** CHECK: `^[a-z][a-z0-9_]{1,28}[a-z0-9]$`, no `__`. Min 3 chars.
 - **Username auto-generation:** `generate_username(name, surname)` DB function. Mirrored in `register-form.tsx` (`buildUsernamePreview`) — keep in sync.
@@ -93,8 +99,8 @@ Remaining work after registration fix:
 - **Search status derivation:** `effectiveStatus = query.length < 2 ? 'idle' : status` — derived in render, avoids `react-hooks/set-state-in-effect` lint error.
 - **`friendships` RLS:** `USING (user_id = auth.uid())` — only current user's rows returned.
 - **`accept_invite` gap:** does not clean up `friend_requests` when users connect via invite link. Cleanup SQL: `DELETE FROM friend_requests fr WHERE EXISTS (SELECT 1 FROM friendships f WHERE f.user_id = fr.from_user_id AND f.friend_id = fr.to_user_id)`.
-- **PostgREST schema cache:** after applying functions via SQL editor, run `NOTIFY pgrst, 'reload schema';` to make them immediately available via the REST API. Without this, RPCs return `PGRST125`.
-- **`app/layout.tsx` metadata:** still has stale CNA defaults (`title: "Create Next App"`). Needs updating to "SimpleWish".
+- **`profiles_select_incoming_request_sender` RLS bug (fixed 2026-06-03):** The policy originally used `fr.from_user_id = fr.id` instead of `fr.from_user_id = profiles.id`. This caused the EXISTS subquery to never match, so sender profiles were invisible under RLS. Incoming requests existed in `friend_requests` but the profiles query silently returned `[]`. Fixed by correcting the USING clause on production. The `friend_requests` query and JS filtering were always correct — the bug was purely in the DB policy expression.
+- **PostgREST schema cache:** after applying functions via SQL editor, run `NOTIFY pgrst, 'reload schema';` to make them immediately available. Without this, RPCs return `PGRST125`.
 - **`migration repair --linked` works without Docker.**
 - **Docker not available in dev** — `supabase db diff/dump/reset` require Docker.
 - **Birthday NULL for most existing users** — registered before birthday field added.
@@ -104,11 +110,12 @@ Remaining work after registration fix:
 
 ## Known issues
 
-- **CRITICAL: Production registration broken** — `is_username_available` RPC returns `PGRST125` (PostgREST schema cache doesn't know the function). Fix: apply migration `20260602000001` via Supabase SQL editor, then run `NOTIFY pgrst, 'reload schema';`
-- Debug `console.error` logging in `registerAction` (`features/auth/actions.ts`) — added for diagnosis, remove after production registration confirmed working
-- `app/layout.tsx` metadata: `title: "Create Next App"` / `description: "Generated by create next app"` — stale defaults, not yet updated to SimpleWish
+- **Registration broken on production** — `is_username_available` RPC returns `PGRST125`. Fix: apply migration `20260602000001` + `NOTIFY pgrst, 'reload schema';`
+- Debug `console.error` in `registerAction` (`features/auth/actions.ts`) — remove after production registration confirmed
+- `app/layout.tsx` metadata: `title: "Create Next App"` — stale, needs updating to "SimpleWish"
 - Birthday empty for most existing users
 - `20260530000000` policies may be missing from remote
+- **Incoming friend requests fixed** — `profiles_select_incoming_request_sender` policy corrected on production (2026-06-03); see technical decisions for root cause
 - `<h1>Лента</h1>` uses `text-xl font-semibold` instead of `.section-title` — deferred
 - `accept_invite` does not clean up `friend_requests` rows when users mix both friend flows
 - Migrations `20260602000000` and `20260602000001` not yet applied to remote
