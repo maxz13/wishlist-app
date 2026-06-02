@@ -147,3 +147,33 @@ export async function updateAvatarUrlAction(
   revalidatePath('/home')
   return {}
 }
+
+export async function removeAvatarAction(): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Не авторизован' }
+
+  // Delete file from storage. Ignore "not found" errors — the file may have
+  // already been deleted or never uploaded; the profile update must still run.
+  const { error: storageError } = await supabase.storage
+    .from('avatars')
+    .remove([`${user.id}/avatar.jpg`])
+
+  if (storageError && !storageError.message.toLowerCase().includes('not found')) {
+    return { error: 'Не удалось удалить фото. Попробуйте ещё раз.' }
+  }
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: null })
+    .eq('id', user.id)
+
+  if (profileError) {
+    return { error: 'Не удалось обновить профиль. Попробуйте ещё раз.' }
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/home')
+  return {}
+}

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import { updateProfileAction, updateAvatarUrlAction, changePasswordAction } from './actions'
+import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction } from './actions'
 import type { UpdateProfileState, ChangePasswordState } from './actions'
 
 function EyeIcon() {
@@ -157,6 +157,20 @@ export function ProfileForm({ profile }: Props) {
     }
   }
 
+  async function handleAvatarRemove() {
+    setAvatarError(null)
+    setAvatarLoading(true)
+    try {
+      const result = await removeAvatarAction()
+      if (result.error) throw new Error(result.error)
+      setAvatarUrl(null)
+    } catch {
+      setAvatarError('Не удалось удалить фото. Попробуйте ещё раз.')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
   function handlePasswordSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setPasswordState(undefined)
@@ -228,6 +242,17 @@ export function ProfileForm({ profile }: Props) {
         >
           {avatarLoading ? 'Загрузка...' : 'Изменить фото'}
         </button>
+
+        {avatarUrl && (
+          <button
+            type="button"
+            onClick={handleAvatarRemove}
+            disabled={avatarLoading}
+            className="text-sm text-gray-400 disabled:opacity-50"
+          >
+            Удалить фото
+          </button>
+        )}
 
         {avatarError && (
           <p className="text-center text-xs text-red-600">{avatarError}</p>

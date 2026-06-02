@@ -26,7 +26,7 @@ export function LoginForm({ next }: { next?: string }) {
           type="email"
           autoComplete="email"
           required
-          className="w-full rounded border border-gray-300 px-3 py-2 text-base"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.email && (
           <p className="text-xs text-red-600">{state.errors.email[0]}</p>
@@ -43,7 +43,7 @@ export function LoginForm({ next }: { next?: string }) {
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded border border-gray-300 px-3 py-2 text-base"
+          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.password && (
           <p className="text-xs text-red-600">{state.errors.password[0]}</p>
