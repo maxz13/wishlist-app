@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateInviteSection } from '@/features/friends/create-invite-section'
 import { pluralRu, friendBirthdayLine } from '@/lib/format'
+import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
+import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
+import { SearchSection } from '@/features/friends/search-section'
 
 type FriendProfile = {
   id: string
@@ -11,8 +14,17 @@ type FriendProfile = {
   birthday: string | null
 }
 
+type SenderProfile = {
+  id: string
+  name: string
+  surname: string
+  username: string
+  avatar_url: string | null
+}
+
 export default async function FriendsPage() {
   const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
   const today = new Date()
 
   const { data: friendships } = await supabase
@@ -21,17 +33,64 @@ export default async function FriendsPage() {
 
   const friendIds = (friendships ?? []).map((f) => f.friend_id as string)
 
-  let friends: FriendProfile[] = []
-  if (friendIds.length > 0) {
+  const [friendsResult, requestsResult] = await Promise.all([
+    friendIds.length > 0
+      ? supabase
+          .from('profiles')
+          .select('id, name, surname, avatar_url, birthday')
+          .in('id', friendIds)
+          .order('name')
+      : Promise.resolve({ data: [] as FriendProfile[] }),
+    supabase
+      .from('friend_requests')
+      .select('id, from_user_id, to_user_id'),
+  ])
+
+  const friends = (friendsResult.data ?? []) as FriendProfile[]
+  const allRequests = (requestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+
+  const outgoingRequests = allRequests.filter(r => r.from_user_id === user!.id)
+  const incomingRequests = allRequests.filter(r => r.to_user_id === user!.id)
+
+  // Fetch sender profiles for incoming requests (permitted by profiles RLS policy)
+  let senderProfiles: SenderProfile[] = []
+  const incomingSenderIds = incomingRequests.map(r => r.from_user_id)
+  if (incomingSenderIds.length > 0) {
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, surname, avatar_url, birthday')
-      .in('id', friendIds)
-      .order('name')
-    friends = (data ?? []) as FriendProfile[]
+      .select('id, name, surname, username, avatar_url')
+      .in('id', incomingSenderIds)
+    senderProfiles = (data ?? []) as SenderProfile[]
   }
 
-  let friendWishlistCountMap = new Map<string, number>()
+  const senderById = new Map(senderProfiles.map(p => [p.id, p]))
+
+  const incomingRequestsList: IncomingRequest[] = incomingRequests
+    .map(r => {
+      const profile = senderById.get(r.from_user_id)
+      if (!profile) return null
+      return {
+        id: r.id,
+        fromUserId: r.from_user_id,
+        fromProfile: {
+          name: profile.name,
+          surname: profile.surname,
+          username: profile.username,
+          avatar_url: profile.avatar_url,
+        },
+      }
+    })
+    .filter((r): r is IncomingRequest => r !== null)
+
+  const outgoingUserIds = outgoingRequests.map(r => r.to_user_id)
+
+  const incomingMapForSearch: Record<string, string> = {}
+  for (const r of incomingRequests) {
+    incomingMapForSearch[r.from_user_id] = r.id
+  }
+
+  // Active wishlist counts per friend
+  const friendWishlistCountMap = new Map<string, number>()
   if (friendIds.length > 0) {
     const { data: counts } = await supabase
       .from('wishlists')
@@ -47,6 +106,14 @@ export default async function FriendsPage() {
     <main className="p-4">
       <h1 className="section-title">Друзья</h1>
 
+      <IncomingRequestsSection requests={incomingRequestsList} />
+
+      <SearchSection
+        initialFriendIds={friendIds}
+        initialOutgoingIds={outgoingUserIds}
+        initialIncomingMap={incomingMapForSearch}
+      />
+
       {friends.length === 0 ? (
         <div className="mt-10 flex flex-col items-center gap-2 text-center">
           <p className="text-base font-medium text-gray-800">
@@ -58,7 +125,7 @@ export default async function FriendsPage() {
           </p>
         </div>
       ) : (
-        <ul className="mt-4 grouped-card">
+        <ul className="mt-6 grouped-card">
           {friends.map((friend, i) => {
             const count = friendWishlistCountMap.get(friend.id) ?? 0
             const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null

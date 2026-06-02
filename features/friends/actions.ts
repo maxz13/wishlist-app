@@ -1,6 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type CreateInviteState =
@@ -42,4 +43,28 @@ export async function createInviteAction(): Promise<CreateInviteState> {
   const inviteUrl = `${protocol}://${host}/invite/${token}`
 
   return { inviteUrl }
+}
+
+export async function sendFriendRequestAction(toUserId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('send_friend_request', { p_to_user_id: toUserId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  return {}
+}
+
+export async function acceptFriendRequestAction(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('accept_friend_request', { p_request_id: requestId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  return {}
+}
+
+export async function declineFriendRequestAction(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('decline_friend_request', { p_request_id: requestId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  return {}
 }

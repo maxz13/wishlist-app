@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { pluralRu, getDaysUntilBirthday, friendBirthdayLine } from '@/lib/format'
+import { pluralRu, friendBirthdayLine } from '@/lib/format'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
@@ -83,7 +83,7 @@ export default async function HomePage() {
   const wishlists = (wishlistsData ?? []) as Wishlist[]
 
   // Item counts for own wishlists
-  let itemCountMap = new Map<string, number>()
+  const itemCountMap = new Map<string, number>()
   if (wishlists.length > 0) {
     const { data: counts } = await supabase
       .from('wishlist_items')
@@ -108,7 +108,7 @@ export default async function HomePage() {
   const profileById = new Map(friends.map((f) => [f.id, f]))
 
   // Active wishlist counts per friend
-  let friendWishlistCountMap = new Map<string, number>()
+  const friendWishlistCountMap = new Map<string, number>()
   if (friendIds.length > 0) {
     const { data: counts } = await supabase
       .from('wishlists')

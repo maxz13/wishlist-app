@@ -33,7 +33,7 @@ export default async function WishlistsPage() {
   const wishlists = (activeResult.data ?? []) as Wishlist[]
   const archived  = (archivedResult.data ?? []) as Wishlist[]
 
-  let itemCountMap = new Map<string, number>()
+  const itemCountMap = new Map<string, number>()
   if (wishlists.length > 0) {
     const { data: counts } = await supabase
       .from('wishlist_items')
