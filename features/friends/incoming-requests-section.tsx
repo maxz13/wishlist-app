@@ -35,7 +35,7 @@ export function IncomingRequestsSection({ requests: initialRequests }: Props) {
         {requests.map((req, i) => (
           <li key={req.id}>
             {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
-            <div className="flex items-start gap-3 px-4 py-3">
+            <div className="flex items-center gap-3 px-4 py-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
                 {req.fromProfile.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -47,24 +47,24 @@ export function IncomingRequestsSection({ requests: initialRequests }: Props) {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900">@{req.fromProfile.username}</p>
-                <p className="text-xs text-gray-400">{req.fromProfile.name} {req.fromProfile.surname}</p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { remove(req.id); startTransition(async () => { await acceptFriendRequestAction(req.id) }) }}
-                    className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
-                  >
-                    Принять
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { remove(req.id); startTransition(async () => { await declineFriendRequestAction(req.id) }) }}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700"
-                  >
-                    Отклонить
-                  </button>
-                </div>
+                <p className="truncate text-sm font-medium text-gray-900">{req.fromProfile.name} {req.fromProfile.surname}</p>
+                <p className="truncate text-xs text-gray-400">@{req.fromProfile.username}</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { remove(req.id); startTransition(async () => { await acceptFriendRequestAction(req.id) }) }}
+                  className="rounded-lg bg-[#22c55e] px-3 py-1.5 text-xs font-medium text-white"
+                >
+                  Принять
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { remove(req.id); startTransition(async () => { await declineFriendRequestAction(req.id) }) }}
+                  className="rounded-lg bg-[#ef4444] px-3 py-1.5 text-xs font-medium text-white"
+                >
+                  Отклонить
+                </button>
               </div>
             </div>
           </li>

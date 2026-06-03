@@ -18,11 +18,17 @@ export default async function AppLayout({
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, name, surname, avatar_url, username')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, { count: pendingCount }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, name, surname, avatar_url, username')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('friend_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('to_user_id', user.id),
+  ])
 
   const initials = profile
     ? (profile.name[0] + (profile.surname?.[0] ?? '')).toUpperCase()
@@ -78,7 +84,7 @@ export default async function AppLayout({
 
       <div className="flex-1 pb-16">{children}</div>
 
-      <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} />
+      <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} />
     </div>
   )
 }

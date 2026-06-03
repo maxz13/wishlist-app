@@ -58,6 +58,7 @@ export async function acceptFriendRequestAction(requestId: string): Promise<{ er
   const { error } = await supabase.rpc('accept_friend_request', { p_request_id: requestId })
   if (error) return { error: error.message }
   revalidatePath('/friends')
+  revalidatePath('/home')
   return {}
 }
 
@@ -66,5 +67,6 @@ export async function declineFriendRequestAction(requestId: string): Promise<{ e
   const { error } = await supabase.rpc('decline_friend_request', { p_request_id: requestId })
   if (error) return { error: error.message }
   revalidatePath('/friends')
+  revalidatePath('/home')
   return {}
 }

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-type Props = { initials: string; avatarUrl: string | null }
+type Props = { initials: string; avatarUrl: string | null; hasPendingRequests: boolean }
 
 function HomeIcon() {
   return (
@@ -47,7 +47,7 @@ function PlusIcon() {
   )
 }
 
-export function BottomNav({ initials, avatarUrl }: Props) {
+export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
   const pathname = usePathname()
 
   function isActive(href: string) {
@@ -79,8 +79,11 @@ export function BottomNav({ initials, avatarUrl }: Props) {
 
         {/* 2. Друзья */}
         <Link href="/friends" className={tabCls('/friends')}>
-          <span className={iconBox}>
+          <span className={`${iconBox} relative`}>
             <UsersIcon />
+            {hasPendingRequests && (
+              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white" />
+            )}
           </span>
           <span>Друзья</span>
         </Link>

@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { pluralRu, friendBirthdayLine } from '@/lib/format'
+import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
+import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
@@ -71,6 +73,39 @@ export default async function HomePage() {
 
   const friendshipRows = (friendshipData ?? []) as Friendship[]
   const friendIds      = friendshipRows.map((f) => f.friend_id)
+
+  // Incoming friend requests — shown as actionable cards above the activity feed
+  type SenderProfile = { id: string; name: string; surname: string; username: string; avatar_url: string | null }
+  const { data: requestsData } = await supabase
+    .from('friend_requests')
+    .select('id, from_user_id, to_user_id')
+    .eq('to_user_id', user!.id)
+  const rawRequests = (requestsData ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+  let incomingRequestsList: IncomingRequest[] = []
+  if (rawRequests.length > 0) {
+    const senderIds = rawRequests.map((r) => r.from_user_id)
+    const { data: senderData } = await supabase
+      .from('profiles')
+      .select('id, name, surname, username, avatar_url')
+      .in('id', senderIds)
+    const senderById = new Map(((senderData ?? []) as SenderProfile[]).map((p) => [p.id, p]))
+    incomingRequestsList = rawRequests
+      .map((r) => {
+        const profile = senderById.get(r.from_user_id)
+        if (!profile) return null
+        return {
+          id: r.id,
+          fromUserId: r.from_user_id,
+          fromProfile: {
+            name: profile.name,
+            surname: profile.surname,
+            username: profile.username,
+            avatar_url: profile.avatar_url,
+          },
+        }
+      })
+      .filter((r): r is IncomingRequest => r !== null)
+  }
 
   // Own wishlists
   const { data: wishlistsData } = await supabase
@@ -266,7 +301,7 @@ export default async function HomePage() {
   const moreWishlistsCount  = Math.max(0, wishlists.length - 3)
 
   // State A: nothing to show at all
-  if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity) {
+  if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity && incomingRequestsList.length === 0) {
     return (
       <main className="px-4 pb-10 pt-4">
         <h1 className="text-xl font-semibold">Лента</h1>
@@ -297,6 +332,8 @@ export default async function HomePage() {
   return (
     <main className="px-4 pb-10 pt-5">
       <h1 className="text-xl font-semibold">Лента</h1>
+
+      <IncomingRequestsSection requests={incomingRequestsList} />
 
       {/* Activity feed — directly under page title, no redundant section heading */}
       {hasActivity && (
