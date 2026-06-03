@@ -102,7 +102,7 @@ export async function createWishlistItemAction(
     title: titleResult.data,
     link: rawLink,
     price: priceValue,
-    is_visible: false,
+    is_visible: true,
   })
 
   if (error) {

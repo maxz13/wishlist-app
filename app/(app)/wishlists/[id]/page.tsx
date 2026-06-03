@@ -184,30 +184,7 @@ export default async function WishlistDetailPage({
 
         {isOwner && <CreateItemSection wishlistId={id} />}
 
-        {isOwner && items.length > 0 && (
-          <div className="mt-6 flex flex-col gap-1.5 border-t border-gray-100 pt-4">
-            <div className="flex items-center gap-2">
-              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-500">
-                <svg width="8" height="6" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-                  <path
-                    d="M1 4l3 3 5-6"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              <span className="text-xs text-gray-400">виден друзьям</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
-              <span className="text-xs text-gray-400">черновик, скрыт от друзей</span>
-            </div>
-          </div>
-        )}
-
-        {isOwner && (
+{isOwner && (
           <div className="mt-6 border-t border-gray-100 pt-4">
             {wishlist.is_archived ? (
               <form action={restoreWishlistAction}>

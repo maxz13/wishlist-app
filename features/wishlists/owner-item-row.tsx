@@ -76,32 +76,6 @@ export function OwnerItemRow({
 
   return (
     <div className={`flex items-start gap-3 py-2.5 ${isReserved ? '-mx-2 rounded-lg bg-green-50 px-2' : ''}`}>
-      {confirming ? (
-        <div
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isDraft ? 'border-2 border-gray-300 bg-transparent' : 'bg-green-500'}`}
-        >
-          {!isDraft && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-              <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={handleToggleVisibility}
-          disabled={anyPending}
-          aria-label={isDraft ? 'Показать друзьям' : 'Скрыть от друзей'}
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40 ${isDraft ? 'border-2 border-gray-300 bg-transparent' : 'bg-green-500'}`}
-        >
-          {!isDraft && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-              <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
-      )}
-
       <div className="min-w-0 flex-1">
         <p
           className={`text-[15px] font-medium leading-snug transition-colors ${
@@ -216,6 +190,17 @@ export function OwnerItemRow({
         )}
       </div>
 
+      {!confirming && !showEditFields && (
+        <button
+          type="button"
+          onClick={handleToggleVisibility}
+          disabled={anyPending}
+          className={`h-11 shrink-0 text-xs disabled:opacity-40 ${isDraft ? 'text-blue-500' : 'text-gray-500'}`}
+        >
+          {isDraft ? 'Показать' : 'Спрятать'}
+        </button>
+      )}
+
       {!confirming && (
         <div className="relative">
           <button
@@ -232,6 +217,13 @@ export function OwnerItemRow({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-full z-20 mt-1 min-w-[7rem] overflow-hidden rounded-xl bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); onExpand() }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-800"
+                >
+                  Переименовать
+                </button>
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); setConfirming(true) }}
