@@ -127,7 +127,7 @@ export async function requestPasswordResetAction(
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.simplewish.es'
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback`,
+    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
   })
 
   if (error) return { message: 'Не удалось отправить письмо. Попробуйте ещё раз.' }

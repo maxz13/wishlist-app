@@ -12,16 +12,15 @@ export async function GET(request: NextRequest) {
     | 'invite'
     | null
 
-  // For the PKCE code flow, Supabase stores the verifier with a "/recovery" suffix
-  // when the code was issued for password recovery. Read it before the exchange so
-  // we can route to /reset-password instead of /home.
-  const verifierCookie = code
-    ? request.cookies.getAll().find((c) => c.name.endsWith('-code-verifier'))
-    : undefined
+  const next = searchParams.get('next')
+  const safeNext =
+    typeof next === 'string' && next.startsWith('/') && !next.startsWith('//')
+      ? next
+      : null
 
   // Determine destination up front; return early if we have nothing to process.
   const dest =
-    code && verifierCookie?.value?.endsWith('/recovery') ? '/reset-password'
+    code && safeNext ? safeNext
     : code ? '/home'
     : tokenHash && type === 'recovery' ? '/reset-password'
     : tokenHash && type ? '/home'
