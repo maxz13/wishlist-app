@@ -63,6 +63,14 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 Session 2026-06-03 complete. All features deployed to production on `main`.
 
+Performance pass complete (same session):
+- Added `loading.tsx` route skeletons for home, friends, wishlists, profile, wishlist detail, friend detail
+- Instrumented layout + Home page with temporary server-side `[PERF]` logs, measured production-mode renders
+- Found sequential Supabase round-trips as the main bottleneck (not query speed)
+- Parallelized Home page queries into two `Promise.all` rounds + one sequential tail
+- Warm Home render: ~766ms → ~253ms (−67%). Cold: ~1062ms → ~495ms (−53%)
+- No RLS, schema, or business logic changes. Instrumentation removed. See `PERFORMANCE_CONTEXT.md`.
+
 Remaining work:
 1. Remove debug `console.error` in `registerAction` (`features/auth/actions.ts`) — was added during registration debugging, still present
 2. Update `app/layout.tsx` metadata: `title: "Create Next App"` → "SimpleWish"

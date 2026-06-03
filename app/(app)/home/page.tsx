@@ -100,107 +100,35 @@ export default async function HomePage() {
   const today        = new Date()
   const sevenDaysAgo = new Date(today.getTime() - 7 * 86_400_000).toISOString()
 
-  // Friendships — include created_at to derive new-friend activity events
-  const { data: friendshipData } = await supabase
-    .from('friendships')
-    .select('friend_id, created_at')
-
-  const friendshipRows = (friendshipData ?? []) as Friendship[]
-  const friendIds      = friendshipRows.map((f) => f.friend_id)
-
-  // Incoming friend requests — shown as actionable cards above the activity feed
   type SenderProfile = { id: string; name: string; surname: string; username: string; avatar_url: string | null }
-  const { data: requestsData } = await supabase
-    .from('friend_requests')
-    .select('id, from_user_id, to_user_id')
-    .eq('to_user_id', user!.id)
-  const rawRequests = (requestsData ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
-  let incomingRequestsList: IncomingRequest[] = []
-  if (rawRequests.length > 0) {
-    const senderIds = rawRequests.map((r) => r.from_user_id)
-    const { data: senderData } = await supabase
-      .from('profiles')
-      .select('id, name, surname, username, avatar_url')
-      .in('id', senderIds)
-    const senderById = new Map(((senderData ?? []) as SenderProfile[]).map((p) => [p.id, p]))
-    incomingRequestsList = rawRequests
-      .map((r) => {
-        const profile = senderById.get(r.from_user_id)
-        if (!profile) return null
-        return {
-          id: r.id,
-          fromUserId: r.from_user_id,
-          fromProfile: {
-            name: profile.name,
-            surname: profile.surname,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
-          },
-        }
-      })
-      .filter((r): r is IncomingRequest => r !== null)
-  }
 
-  // Own wishlists
-  const { data: wishlistsData } = await supabase
-    .from('wishlists')
-    .select('id, title')
-    .eq('owner_id', user!.id)
-    .eq('is_archived', false)
-    .order('created_at', { ascending: false })
-
-  const wishlists = (wishlistsData ?? []) as Wishlist[]
-
-  // Item counts for own wishlists
-  const itemCountMap = new Map<string, number>()
-  if (wishlists.length > 0) {
-    const { data: counts } = await supabase
-      .from('wishlist_items')
-      .select('wishlist_id')
-      .in('wishlist_id', wishlists.map(w => w.id))
-    for (const row of (counts ?? [])) {
-      itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
-    }
-  }
-
-  // Friend profiles — used for Friends section, Я подарю, and activity events
-  let friends: Friend[] = []
-  if (friendIds.length > 0) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name, surname, birthday, avatar_url')
-      .in('id', friendIds)
-      .order('name')
-    friends = (data ?? []) as Friend[]
-  }
-
-  const profileById = new Map(friends.map((f) => [f.id, f]))
-
-  // Active wishlist counts per friend
-  const friendWishlistCountMap = new Map<string, number>()
-  if (friendIds.length > 0) {
-    const { data: counts } = await supabase
+  // Round 1: all queries that depend only on user.id — run in parallel
+  const [
+    friendshipResult,
+    requestsResult,
+    wishlistsResult,
+    myReservationsResult,
+    newItemsResult,
+    newReservationsResult,
+    accessGrantedResult,
+  ] = await Promise.all([
+    supabase
+      .from('friendships')
+      .select('friend_id, created_at'),
+    supabase
+      .from('friend_requests')
+      .select('id, from_user_id, to_user_id')
+      .eq('to_user_id', user!.id),
+    supabase
       .from('wishlists')
-      .select('owner_id')
-      .in('owner_id', friendIds)
+      .select('id, title')
+      .eq('owner_id', user!.id)
       .eq('is_archived', false)
-    for (const row of (counts ?? [])) {
-      friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
-    }
-  }
-
-  // Activity: new wishlists, new visible items by friends, reservations on own items,
-  // and private wishlist access grants — last 7 days
-  const [newWishlistsResult, newItemsResult, newReservationsResult, accessGrantedResult] = await Promise.all([
-    friendIds.length > 0
-      ? supabase
-          .from('wishlists')
-          .select('id, title, created_at, profiles!inner(id, name, surname)')
-          .in('owner_id', friendIds)
-          .eq('is_archived', false)
-          .gte('created_at', sevenDaysAgo)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [] as WishlistActivityRow[] }),
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('reservations')
+      .select('id, wishlist_item_id')
+      .eq('reserved_by_user_id', user!.id),
     supabase
       .from('wishlist_items')
       .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
@@ -220,6 +148,127 @@ export default async function HomePage() {
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false }),
   ])
+
+  // Derive IDs from Round 1 results
+  const friendshipRows = (friendshipResult.data ?? []) as Friendship[]
+  const friendIds      = friendshipRows.map((f) => f.friend_id)
+  const rawRequests    = (requestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+  const wishlists      = (wishlistsResult.data ?? []) as Wishlist[]
+  const myReservations = (myReservationsResult.data ?? []) as Array<{ id: string; wishlist_item_id: string }>
+
+  // Round 2: queries that depend on Round 1 IDs — run in parallel
+  const [
+    senderProfilesResult,
+    itemCountsResult,
+    friendProfilesResult,
+    friendWishlistsResult,
+    newWishlistsResult,
+    reservedItemsResult,
+  ] = await Promise.all([
+    // Sender profiles for incoming request cards (depends on rawRequests)
+    (async () => {
+      if (rawRequests.length === 0) return { data: [] as SenderProfile[] }
+      const senderIds = rawRequests.map((r) => r.from_user_id)
+      return supabase
+        .from('profiles')
+        .select('id, name, surname, username, avatar_url')
+        .in('id', senderIds)
+    })(),
+    // Own wishlist item counts (depends on wishlists)
+    (async () => {
+      if (wishlists.length === 0) return { data: [] as Array<{ wishlist_id: string }> }
+      return supabase
+        .from('wishlist_items')
+        .select('wishlist_id')
+        .in('wishlist_id', wishlists.map(w => w.id))
+    })(),
+    // Friend profiles (depends on friendIds)
+    (async () => {
+      if (friendIds.length === 0) return { data: [] as Friend[] }
+      return supabase
+        .from('profiles')
+        .select('id, name, surname, birthday, avatar_url')
+        .in('id', friendIds)
+        .order('name')
+    })(),
+    // Friend wishlist counts (depends on friendIds)
+    (async () => {
+      if (friendIds.length === 0) return { data: [] as Array<{ owner_id: string }> }
+      return supabase
+        .from('wishlists')
+        .select('owner_id')
+        .in('owner_id', friendIds)
+        .eq('is_archived', false)
+    })(),
+    // Activity: new_wishlist (depends on friendIds)
+    (async () => {
+      if (friendIds.length === 0) return { data: [] as WishlistActivityRow[] }
+      return supabase
+        .from('wishlists')
+        .select('id, title, created_at, profiles!inner(id, name, surname)')
+        .in('owner_id', friendIds)
+        .eq('is_archived', false)
+        .gte('created_at', sevenDaysAgo)
+        .order('created_at', { ascending: false })
+    })(),
+    // "Я подарю" reserved items (depends on myReservations)
+    (async () => {
+      if (myReservations.length === 0) return { data: [] as Array<{ id: string; title: string; wishlist_id: string }> }
+      const reservedItemIds = myReservations.map((r) => r.wishlist_item_id)
+      return supabase
+        .from('wishlist_items')
+        .select('id, title, wishlist_id')
+        .in('id', reservedItemIds)
+    })(),
+  ])
+
+  // Process Round 2 results
+  const senderById = new Map(
+    ((senderProfilesResult.data ?? []) as SenderProfile[]).map((p) => [p.id, p])
+  )
+  const incomingRequestsList: IncomingRequest[] = rawRequests
+    .map((r) => {
+      const profile = senderById.get(r.from_user_id)
+      if (!profile) return null
+      return {
+        id: r.id,
+        fromUserId: r.from_user_id,
+        fromProfile: {
+          name: profile.name,
+          surname: profile.surname,
+          username: profile.username,
+          avatar_url: profile.avatar_url,
+        },
+      }
+    })
+    .filter((r): r is IncomingRequest => r !== null)
+
+  const itemCountMap = new Map<string, number>()
+  for (const row of (itemCountsResult.data ?? [])) {
+    itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
+  }
+
+  const friends    = (friendProfilesResult.data ?? []) as Friend[]
+  const profileById = new Map(friends.map((f) => [f.id, f]))
+
+  const friendWishlistCountMap = new Map<string, number>()
+  for (const row of (friendWishlistsResult.data ?? [])) {
+    friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
+  }
+
+  const reservedItems = (reservedItemsResult.data ?? []) as Array<{ id: string; title: string; wishlist_id: string }>
+
+  // Round 3: "Я подарю" wishlists — depends on reservedItems from Round 2
+  let itemWishlists: Array<{ id: string; owner_id: string }> = []
+  if (reservedItems.length > 0) {
+    const itemWishlistIds = [...new Set(reservedItems.map((i) => i.wishlist_id))]
+    const { data } = await supabase
+      .from('wishlists')
+      .select('id, owner_id')
+      .in('id', itemWishlistIds)
+      .eq('is_archived', false)
+    itemWishlists = (data ?? []) as typeof itemWishlists
+  }
 
   const newWishlistsRaw = (newWishlistsResult.data ?? []) as unknown as WishlistActivityRow[]
   const newItemsRaw     = ((newItemsResult.data ?? []) as unknown as ItemActivityRow[])
@@ -308,39 +357,8 @@ export default async function HomePage() {
 
   const hasActivity = displayedEvents.length > 0
 
-  // My reservations
-  const { data: reservationsData } = await supabase
-    .from('reservations')
-    .select('id, wishlist_item_id')
-    .eq('reserved_by_user_id', user!.id)
-
-  const myReservations = (reservationsData ?? []) as Array<{ id: string; wishlist_item_id: string }>
-
-  // Reserved wishlist items
-  let reservedItems: Array<{ id: string; title: string; wishlist_id: string }> = []
-  if (myReservations.length > 0) {
-    const reservedItemIds = myReservations.map((r) => r.wishlist_item_id)
-    const { data } = await supabase
-      .from('wishlist_items')
-      .select('id, title, wishlist_id')
-      .in('id', reservedItemIds)
-    reservedItems = (data ?? []) as typeof reservedItems
-  }
-
-  // Wishlists for reserved items (friends' wishlists — needed for owner_id + archived check)
-  let itemWishlists: Array<{ id: string; owner_id: string }> = []
-  if (reservedItems.length > 0) {
-    const itemWishlistIds = [...new Set(reservedItems.map((i) => i.wishlist_id))]
-    const { data } = await supabase
-      .from('wishlists')
-      .select('id, owner_id')
-      .in('id', itemWishlistIds)
-      .eq('is_archived', false)
-    itemWishlists = (data ?? []) as typeof itemWishlists
-  }
-
-  const itemById          = new Map(reservedItems.map((i) => [i.id, i]))
-  const itemWishlistById  = new Map(itemWishlists.map((w) => [w.id, w]))
+  const itemById         = new Map(reservedItems.map((i) => [i.id, i]))
+  const itemWishlistById = new Map(itemWishlists.map((w) => [w.id, w]))
 
   // Compose Я подарю rows — skip items that are drafted/archived/deleted
   const reservationRows = myReservations
