@@ -6,6 +6,7 @@ type Wishlist = {
   id: string
   title: string
   created_at: string
+  visibility: string
 }
 
 export default async function WishlistsPage() {
@@ -17,13 +18,13 @@ export default async function WishlistsPage() {
   const [activeResult, archivedResult] = await Promise.all([
     supabase
       .from('wishlists')
-      .select('id, title, created_at')
+      .select('id, title, created_at, visibility')
       .eq('owner_id', user!.id)
       .eq('is_archived', false)
       .order('created_at', { ascending: false }),
     supabase
       .from('wishlists')
-      .select('id, title, created_at')
+      .select('id, title, created_at, visibility')
       .eq('owner_id', user!.id)
       .eq('is_archived', true)
       .order('updated_at', { ascending: false }),
@@ -33,13 +34,18 @@ export default async function WishlistsPage() {
   const archived  = (archivedResult.data ?? []) as Wishlist[]
 
   const itemCountMap = new Map<string, number>()
+  const accessCountMap = new Map<string, number>()
   if (wishlists.length > 0) {
-    const { data: counts } = await supabase
-      .from('wishlist_items')
-      .select('wishlist_id')
-      .in('wishlist_id', wishlists.map(w => w.id))
-    for (const row of (counts ?? [])) {
+    const wishlistIds = wishlists.map(w => w.id)
+    const [itemRows, accessRows] = await Promise.all([
+      supabase.from('wishlist_items').select('wishlist_id').in('wishlist_id', wishlistIds),
+      supabase.from('wishlist_access').select('wishlist_id').in('wishlist_id', wishlistIds),
+    ])
+    for (const row of (itemRows.data ?? [])) {
       itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
+    }
+    for (const row of (accessRows.data ?? [])) {
+      accessCountMap.set(row.wishlist_id, (accessCountMap.get(row.wishlist_id) ?? 0) + 1)
     }
   }
 
@@ -66,6 +72,8 @@ export default async function WishlistsPage() {
                 title={w.title}
                 itemCount={itemCountMap.get(w.id) ?? 0}
                 isArchived={false}
+                visibility={w.visibility}
+                selectedFriendsCount={accessCountMap.get(w.id) ?? 0}
               />
             </li>
           ))}

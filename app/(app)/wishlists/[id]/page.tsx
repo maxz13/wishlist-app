@@ -10,6 +10,10 @@ import {
   type ReservationState,
 } from '@/features/wishlists/reservation-controls'
 import { archiveWishlistAction, restoreWishlistAction } from '@/features/wishlists/actions'
+import {
+  WishlistAccessSection,
+  type WishlistVisibility,
+} from '@/features/wishlists/wishlist-access-section'
 
 type WishlistItem = {
   id: string
@@ -36,13 +40,38 @@ export default async function WishlistDetailPage({
 
   const { data: wishlist } = await supabase
     .from('wishlists')
-    .select('id, title, owner_id, is_archived')
+    .select('id, title, owner_id, is_archived, visibility')
     .eq('id', id)
     .single()
 
   if (!wishlist) notFound()
 
   const isOwner = wishlist.owner_id === user!.id
+
+  // Owner-only: current access list + friend list for the visibility selector
+  let accessUserIds: string[] = []
+  let ownerFriends: { id: string; name: string; surname: string; avatar_url: string | null }[] = []
+
+  if (isOwner) {
+    const [accessResult, friendshipsResult] = await Promise.all([
+      supabase.from('wishlist_access').select('user_id').eq('wishlist_id', id),
+      supabase.from('friendships').select('friend_id').eq('user_id', user!.id),
+    ])
+    accessUserIds = ((accessResult.data ?? []) as Array<{ user_id: string }>).map(
+      (r) => r.user_id,
+    )
+    const friendIds = (
+      (friendshipsResult.data ?? []) as Array<{ friend_id: string }>
+    ).map((r) => r.friend_id)
+    if (friendIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, surname, avatar_url')
+        .in('id', friendIds)
+        .order('name')
+      ownerFriends = (profiles ?? []) as typeof ownerFriends
+    }
+  }
 
   let itemsQuery = supabase
     .from('wishlist_items')
@@ -184,7 +213,16 @@ export default async function WishlistDetailPage({
 
         {isOwner && <CreateItemSection wishlistId={id} />}
 
-{isOwner && (
+        {isOwner && (
+          <WishlistAccessSection
+            wishlistId={id}
+            currentVisibility={(wishlist.visibility as WishlistVisibility) ?? 'all_friends'}
+            selectedFriendIds={accessUserIds}
+            friends={ownerFriends}
+          />
+        )}
+
+        {isOwner && (
           <div className="mt-6 border-t border-gray-100 pt-4">
             {wishlist.is_archived ? (
               <form action={restoreWishlistAction}>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRef, useState, useTransition } from 'react'
+import { Lock } from 'lucide-react'
 import { pluralRu } from '@/lib/format'
 import {
   archiveWishlistAction,
@@ -15,9 +16,11 @@ interface WishlistCardProps {
   title: string
   itemCount: number
   isArchived: boolean
+  visibility?: string
+  selectedFriendsCount?: number
 }
 
-export function WishlistCard({ id, title, itemCount, isArchived }: WishlistCardProps) {
+export function WishlistCard({ id, title, itemCount, isArchived, visibility, selectedFriendsCount }: WishlistCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -107,6 +110,17 @@ export function WishlistCard({ id, title, itemCount, isArchived }: WishlistCardP
             {itemCount > 0 && (
               <p className="text-xs text-gray-400">
                 {itemCount} {pluralRu(itemCount, 'желание', 'желания', 'желаний')}
+              </p>
+            )}
+            {!isArchived && visibility === 'private' && (
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
+                <Lock size={11} className="shrink-0" />
+                Скрыт от всех
+              </p>
+            )}
+            {!isArchived && visibility === 'selected_friends' && (selectedFriendsCount ?? 0) > 0 && (
+              <p className="mt-0.5 text-xs text-gray-400">
+                Виден {selectedFriendsCount} {pluralRu(selectedFriendsCount ?? 0, 'другу', 'друзьям', 'друзьям')}
               </p>
             )}
           </Link>

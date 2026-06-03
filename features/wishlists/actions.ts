@@ -330,6 +330,47 @@ export async function updateWishlistTitleAction(
   return {}
 }
 
+export async function updateWishlistVisibilityAction(
+  wishlistId: string,
+  visibility: string,
+  friendIds: string[]
+): Promise<{ error?: string }> {
+  if (!['all_friends', 'private', 'selected_friends'].includes(visibility)) {
+    return { error: 'Неверный тип доступа' }
+  }
+
+  // Adjustment: selected_friends with no friends selected → treat as private
+  const effectiveVisibility =
+    visibility === 'selected_friends' && friendIds.length === 0 ? 'private' : visibility
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const { error: updateError } = await supabase
+    .from('wishlists')
+    .update({ visibility: effectiveVisibility })
+    .eq('id', wishlistId)
+    .eq('owner_id', user.id)
+  if (updateError) return { error: 'Не удалось сохранить. Попробуйте ещё раз.' }
+
+  // Replace access list (delete all, then insert selected)
+  await supabase.from('wishlist_access').delete().eq('wishlist_id', wishlistId)
+  if (effectiveVisibility === 'selected_friends' && friendIds.length > 0) {
+    const { error: insertError } = await supabase
+      .from('wishlist_access')
+      .insert(friendIds.map((uid) => ({ wishlist_id: wishlistId, user_id: uid })))
+    if (insertError) return { error: 'Не удалось обновить список. Попробуйте ещё раз.' }
+  }
+
+  revalidatePath('/wishlists')
+  revalidatePath(`/wishlists/${wishlistId}`)
+  revalidatePath('/home')
+  return {}
+}
+
 export async function deleteWishlistAction(
   wishlistId: string
 ): Promise<{ error?: string }> {
