@@ -129,7 +129,7 @@ export function OwnerItemRow({
 
         <div
           className={`overflow-hidden transition-all duration-150 ease-in-out ${
-            showEditFields ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            showEditFields ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
         >
           <form
@@ -137,8 +137,14 @@ export function OwnerItemRow({
             onSubmit={handleSave}
             className="pb-1 pt-2"
           >
-            <input type="hidden" name="title" defaultValue={item.title} />
             <div className="flex flex-col gap-2">
+              <input
+                name="title"
+                type="text"
+                placeholder="Название"
+                defaultValue={item.title}
+                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+              />
               <input
                 name="price"
                 type="number"
@@ -156,8 +162,9 @@ export function OwnerItemRow({
                 className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
               />
             </div>
-            {(saveState?.errors?.price || saveState?.errors?.link || (saveState?.message && !saveState.success)) && (
+            {(saveState?.errors?.title || saveState?.errors?.price || saveState?.errors?.link || (saveState?.message && !saveState.success)) && (
               <div className="mt-1 flex flex-col gap-0.5">
+                {saveState?.errors?.title && <p className="text-xs text-red-600">{saveState.errors.title[0]}</p>}
                 {saveState?.errors?.price && <p className="text-xs text-red-600">{saveState.errors.price[0]}</p>}
                 {saveState?.errors?.link && <p className="text-xs text-red-600">{saveState.errors.link[0]}</p>}
                 {saveState?.message && !saveState.success && <p className="text-xs text-red-600">{saveState.message}</p>}

@@ -1,7 +1,6 @@
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateWishlistSection } from '@/features/wishlists/create-wishlist-section'
-import { pluralRu } from '@/lib/format'
+import { WishlistCard } from '@/features/wishlists/wishlist-card'
 
 type Wishlist = {
   id: string
@@ -59,29 +58,17 @@ export default async function WishlistsPage() {
         </div>
       ) : (
         <ul className="mt-4 grouped-card">
-          {wishlists.map((w, i) => {
-            const count = itemCountMap.get(w.id) ?? 0
-            return (
-              <li key={w.id}>
-                {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
-                <Link
-                  href={`/wishlists/${w.id}`}
-                  className="flex items-center justify-between px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{w.title}</p>
-                    <p className="text-xs text-gray-400">
-                      {count} {pluralRu(count, 'желание', 'желания', 'желаний')}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1 text-gray-400">
-                    <span className="text-xs">{count}</span>
-                    <span>›</span>
-                  </div>
-                </Link>
-              </li>
-            )
-          })}
+          {wishlists.map((w, i) => (
+            <li key={w.id}>
+              {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+              <WishlistCard
+                id={w.id}
+                title={w.title}
+                itemCount={itemCountMap.get(w.id) ?? 0}
+                isArchived={false}
+              />
+            </li>
+          ))}
         </ul>
       )}
 
@@ -94,13 +81,12 @@ export default async function WishlistsPage() {
             {archived.map((w, i) => (
               <li key={w.id}>
                 {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
-                <Link
-                  href={`/wishlists/${w.id}`}
-                  className="flex items-center justify-between px-4 py-2.5"
-                >
-                  <p className="text-sm text-gray-400">{w.title}</p>
-                  <span className="text-gray-300">›</span>
-                </Link>
+                <WishlistCard
+                  id={w.id}
+                  title={w.title}
+                  itemCount={0}
+                  isArchived={true}
+                />
               </li>
             ))}
           </ul>

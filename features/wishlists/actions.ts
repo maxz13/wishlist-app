@@ -302,3 +302,52 @@ export async function restoreWishlistAction(formData: FormData): Promise<void> {
   revalidatePath('/wishlists')
   revalidatePath('/home')
 }
+
+export async function updateWishlistTitleAction(
+  wishlistId: string,
+  newTitle: string
+): Promise<{ error?: string }> {
+  const trimmed = newTitle.trim()
+  if (!trimmed) return { error: 'Введите название' }
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const { error } = await supabase
+    .from('wishlists')
+    .update({ title: trimmed })
+    .eq('id', wishlistId)
+    .eq('owner_id', user.id)
+
+  if (error) return { error: 'Не удалось сохранить. Попробуйте ещё раз.' }
+
+  revalidatePath('/wishlists')
+  revalidatePath(`/wishlists/${wishlistId}`)
+  revalidatePath('/home')
+  return {}
+}
+
+export async function deleteWishlistAction(
+  wishlistId: string
+): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const { error } = await supabase
+    .from('wishlists')
+    .delete()
+    .eq('id', wishlistId)
+    .eq('owner_id', user.id)
+
+  if (error) return { error: 'Не удалось удалить. Попробуйте ещё раз.' }
+
+  revalidatePath('/wishlists')
+  revalidatePath('/home')
+  return {}
+}
