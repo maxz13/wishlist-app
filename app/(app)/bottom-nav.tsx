@@ -115,7 +115,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
           {avatarUrl ? (
             <span
               className={
-                'flex h-6 w-6 shrink-0 overflow-hidden rounded-full ' +
+                'flex h-7 w-7 shrink-0 overflow-hidden rounded-full ' +
                 (isActive('/profile') ? 'border-2 border-[#3b82f6]' : '')
               }
             >
