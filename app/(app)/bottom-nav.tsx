@@ -7,7 +7,7 @@ type Props = { initials: string; avatarUrl: string | null; hasPendingRequests: b
 
 function HomeIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <svg className="h-[23px] w-[23px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
@@ -16,7 +16,7 @@ function HomeIcon() {
 
 function UsersIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <svg className="h-[23px] w-[23px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 00-3-3.87" />
@@ -27,7 +27,7 @@ function UsersIcon() {
 
 function ListIcon() {
   return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <svg className="h-[23px] w-[23px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
       <line x1="8" y1="6" x2="21" y2="6" />
       <line x1="8" y1="12" x2="21" y2="12" />
       <line x1="8" y1="18" x2="21" y2="18" />
@@ -40,7 +40,7 @@ function ListIcon() {
 
 function PlusIcon() {
   return (
-    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
@@ -62,12 +62,12 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
     )
   }
 
-  // Fixed 24×24 icon area keeps every tab vertically aligned
-  const iconBox = 'flex h-6 w-6 items-center justify-center'
+  // Fixed 28×28 icon area keeps every tab vertically aligned
+  const iconBox = 'flex h-7 w-7 items-center justify-center'
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white">
-      <div className="flex h-16 items-center">
+      <div className="flex h-[74px] items-center">
 
         {/* 1. Лента */}
         <Link href="/home" className={tabCls('/home')}>
@@ -92,11 +92,11 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
             circle itself has no translate (avoids pointer-event misalignment).
             bg-[#3b82f6] is an explicit hex value that bypasses the CSS-variable
             chain and renders reliably in Tailwind v4. */}
-        <div className="-mt-4 flex flex-1 items-center justify-center">
+        <div className="-mt-[18px] flex flex-1 items-center justify-center">
           <Link
             href="/wishlists"
             aria-label="Создать вишлист"
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-[#3b82f6] text-white shadow-lg"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-[#3b82f6] text-white shadow-lg"
           >
             <PlusIcon />
           </Link>
