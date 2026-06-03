@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useActionState } from 'react'
 import { registerAction } from './actions'
 import type { RegisterFormState } from './schemas'
@@ -40,14 +39,7 @@ export function RegisterForm({ next }: { next?: string }) {
   const usernameValue = usernameManual ? username : buildUsernamePreview(name, surname)
 
   if (state?.success) {
-    return (
-      <div className="flex flex-col gap-4">
-        <p className="text-sm text-green-700">{state.message}</p>
-        <Link href="/login" className="text-sm underline">
-          Войти
-        </Link>
-      </div>
-    )
+    return <p className="text-sm text-green-700">{state.message}</p>
   }
 
   return (

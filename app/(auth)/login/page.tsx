@@ -24,6 +24,11 @@ export default async function LoginPage({
             Зарегистрироваться
           </Link>
         </p>
+        <p className="mt-2 text-sm text-gray-600">
+          <Link href="/forgot-password" className="underline">
+            Забыли пароль?
+          </Link>
+        </p>
       </div>
     </main>
   )

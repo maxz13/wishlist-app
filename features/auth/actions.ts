@@ -113,6 +113,44 @@ export async function registerAction(
   }
 }
 
+export type ForgotPasswordState = { message?: string; success?: boolean } | undefined
+export type ResetPasswordState = { message?: string } | undefined
+
+export async function requestPasswordResetAction(
+  _prevState: ForgotPasswordState,
+  formData: FormData
+): Promise<ForgotPasswordState> {
+  const email = (formData.get('email') as string)?.trim()
+  if (!email) return { message: 'Введите email' }
+
+  const supabase = await createServerSupabaseClient()
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.simplewish.es'
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback`,
+  })
+
+  if (error) return { message: 'Не удалось отправить письмо. Попробуйте ещё раз.' }
+  return { success: true, message: 'Письмо с инструкциями отправлено. Проверьте почту.' }
+}
+
+export async function resetPasswordAction(
+  _prevState: ResetPasswordState,
+  formData: FormData
+): Promise<ResetPasswordState> {
+  const password = (formData.get('password') as string)?.trim()
+  if (!password || password.length < 8) {
+    return { message: 'Пароль должен содержать не менее 8 символов' }
+  }
+
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) return { message: 'Не удалось обновить пароль. Попробуйте ещё раз.' }
+
+  redirect('/home')
+}
+
 export async function logoutAction(): Promise<void> {
   const supabase = await createServerSupabaseClient()
   await supabase.auth.signOut()
