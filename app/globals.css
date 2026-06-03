@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #171717;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -22,5 +22,42 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), sans-serif;
+}
+
+.section-title {
+  font-size: 1.0625rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.grouped-card {
+  background-color: #ffffff;
+  border: 1px solid #f3f4f6;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.10), 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.feed-bullet {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background-color: #93c5fd;
+  flex-shrink: 0;
+}
+
+/* Prevent iOS/mobile auto-zoom on input focus (requires >= 16px font-size) */
+input:not([type="hidden"]),
+textarea,
+select {
+  font-size: 16px !important;
+}
+
+.grouped-card-divider {
+  height: 1px;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #f3f4f6;
 }
