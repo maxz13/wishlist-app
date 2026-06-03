@@ -1,35 +1,53 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   deleteWishlistItemAction,
   toggleWishlistItemVisibilityAction,
+  updateWishlistItemAction,
+  type UpdateWishlistItemState,
 } from './actions'
 
 interface OwnerItemRowProps {
-  item: { id: string; title: string; price: number | null; is_visible: boolean }
+  item: {
+    id: string
+    title: string
+    link: string | null
+    price: number | null
+    is_visible: boolean
+  }
   wishlistId: string
   isReserved: boolean
+  isExpanded: boolean
+  onExpand: () => void
+  onCollapse: () => void
 }
 
-export function OwnerItemRow({ item, wishlistId, isReserved }: OwnerItemRowProps) {
+export function OwnerItemRow({
+  item,
+  wishlistId,
+  isReserved,
+  isExpanded,
+  onExpand,
+  onCollapse,
+}: OwnerItemRowProps) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<UpdateWishlistItemState>(undefined)
   const [deletePending, startDeleteTransition] = useTransition()
   const [visibilityPending, startVisibilityTransition] = useTransition()
-  const anyPending = deletePending || visibilityPending
+  const [savePending, startSaveTransition] = useTransition()
+  const anyPending = deletePending || visibilityPending || savePending
 
   function handleDelete() {
     setDeleteError(null)
     startDeleteTransition(async () => {
       const result = await deleteWishlistItemAction(item.id, wishlistId)
-      if (result?.error) {
-        setDeleteError(result.error)
-      }
+      if (result?.error) setDeleteError(result.error)
     })
   }
 
@@ -37,31 +55,34 @@ export function OwnerItemRow({ item, wishlistId, isReserved }: OwnerItemRowProps
     setVisibilityError(null)
     startVisibilityTransition(async () => {
       const result = await toggleWishlistItemVisibilityAction(item.id, wishlistId)
-      if (result?.error) {
-        setVisibilityError(result.error)
-      } else {
-        router.refresh()
-      }
+      if (result?.error) setVisibilityError(result.error)
+      else router.refresh()
+    })
+  }
+
+  function handleSave(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setSaveState(undefined)
+    const formData = new FormData(e.currentTarget)
+    startSaveTransition(async () => {
+      const result = await updateWishlistItemAction(item.id, wishlistId, formData)
+      if (result?.success) onCollapse()
+      else setSaveState(result)
     })
   }
 
   const isDraft = !item.is_visible
+  const showEditFields = isExpanded && !confirming
 
   return (
-    <div className={`flex items-start gap-3 py-3.5 ${isReserved ? '-mx-2 rounded-lg bg-green-50 px-2' : ''}`}>
+    <div className={`flex items-start gap-3 py-2.5 ${isReserved ? '-mx-2 rounded-lg bg-green-50 px-2' : ''}`}>
       {confirming ? (
         <div
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isDraft ? 'bg-gray-300' : 'bg-green-500'}`}
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isDraft ? 'border-2 border-gray-300 bg-transparent' : 'bg-green-500'}`}
         >
           {!isDraft && (
             <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-              <path
-                d="M1 4l3 3 5-6"
-                stroke="white"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </div>
@@ -71,17 +92,11 @@ export function OwnerItemRow({ item, wishlistId, isReserved }: OwnerItemRowProps
           onClick={handleToggleVisibility}
           disabled={anyPending}
           aria-label={isDraft ? 'Показать друзьям' : 'Скрыть от друзей'}
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40 ${isDraft ? 'bg-gray-300' : 'bg-green-500'}`}
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-opacity disabled:opacity-40 ${isDraft ? 'border-2 border-gray-300 bg-transparent' : 'bg-green-500'}`}
         >
           {!isDraft && (
             <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-              <path
-                d="M1 4l3 3 5-6"
-                stroke="white"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
         </button>
@@ -96,22 +111,69 @@ export function OwnerItemRow({ item, wishlistId, isReserved }: OwnerItemRowProps
           {confirming ? (
             item.title
           ) : (
-            <Link
-              href={`/wishlists/${wishlistId}/items/${item.id}`}
-              className="block"
+            <button
+              type="button"
+              onClick={isExpanded ? onCollapse : onExpand}
+              className="block w-full text-left"
             >
               {item.title}
-            </Link>
+            </button>
           )}
         </p>
 
-        {!confirming && item.price !== null && (
-          <p className={`mt-0.5 text-xs ${isDraft ? 'text-gray-400' : 'text-gray-700'}`}>
-            {item.price.toLocaleString('ru-RU')} ₽
+        {!confirming && item.price !== null && !showEditFields && (
+          <p className={`mt-0.5 text-sm ${isDraft ? 'text-gray-400' : 'text-gray-700'}`}>
+            {item.price.toLocaleString('ru-RU')} €
           </p>
         )}
 
-        {isReserved && !confirming && (
+        <div
+          className={`overflow-hidden transition-all duration-150 ease-in-out ${
+            showEditFields ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          }`}
+        >
+          <form
+            key={showEditFields ? 'open' : 'closed'}
+            onSubmit={handleSave}
+            className="pb-1 pt-2"
+          >
+            <input type="hidden" name="title" defaultValue={item.title} />
+            <div className="flex flex-col gap-2">
+              <input
+                name="price"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="299 €"
+                defaultValue={item.price ?? ''}
+                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+              />
+              <input
+                name="link"
+                type="url"
+                placeholder="Ссылка на товар"
+                defaultValue={item.link ?? ''}
+                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+              />
+            </div>
+            {(saveState?.errors?.price || saveState?.errors?.link || (saveState?.message && !saveState.success)) && (
+              <div className="mt-1 flex flex-col gap-0.5">
+                {saveState?.errors?.price && <p className="text-xs text-red-600">{saveState.errors.price[0]}</p>}
+                {saveState?.errors?.link && <p className="text-xs text-red-600">{saveState.errors.link[0]}</p>}
+                {saveState?.message && !saveState.success && <p className="text-xs text-red-600">{saveState.message}</p>}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={savePending}
+              className="mt-2.5 text-sm font-medium text-[#3b82f6] disabled:opacity-40"
+            >
+              {savePending ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </form>
+        </div>
+
+        {isReserved && !confirming && !showEditFields && (
           <p className="mt-0.5 text-xs text-gray-500">Друг подарит</p>
         )}
 
@@ -148,15 +210,32 @@ export function OwnerItemRow({ item, wishlistId, isReserved }: OwnerItemRowProps
       </div>
 
       {!confirming && (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          disabled={anyPending}
-          aria-label="Удалить"
-          className="mt-0.5 shrink-0 text-base leading-none text-gray-400 disabled:opacity-40"
-        >
-          ×
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            disabled={anyPending}
+            aria-label="Действия"
+            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center text-xl leading-none text-gray-400 disabled:opacity-40"
+          >
+            ⋯
+          </button>
+
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full z-20 mt-1 min-w-[7rem] overflow-hidden rounded-xl bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); setConfirming(true) }}
+                  className="w-full px-4 py-2.5 text-left text-sm text-red-500"
+                >
+                  Удалить
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   )

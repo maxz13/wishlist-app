@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateItemSection } from '@/features/wishlists/create-item-section'
 import { CircleMarker } from '@/features/wishlists/circle-marker'
-import { OwnerItemRow } from '@/features/wishlists/owner-item-row'
+import { OwnerItemList } from '@/features/wishlists/owner-item-list'
+import { ReserveButton } from '@/features/wishlists/reserve-button'
 import {
   ReservationControls,
   type ReservationState,
@@ -111,7 +112,15 @@ export default async function WishlistDetailPage({
       <h1 className="mt-3 text-xl font-bold leading-tight">{wishlist.title}</h1>
 
       <div className="mt-5">
-        {items.length > 0 && (
+        {isOwner && items.length > 0 && (
+          <OwnerItemList
+            items={items}
+            wishlistId={id}
+            reservedItemIds={Array.from(reservationByItemId.keys())}
+          />
+        )}
+
+        {!isOwner && items.length > 0 && (
           <div className="divide-y divide-gray-100">
             {items.map((item) => {
               const reserverId = reservationByItemId.get(item.id) ?? null
@@ -121,15 +130,8 @@ export default async function WishlistDetailPage({
                   ? 'mine'
                   : 'other'
 
-              return isOwner ? (
-                <OwnerItemRow
-                  key={item.id}
-                  item={{ id: item.id, title: item.title, price: item.price, is_visible: item.is_visible }}
-                  wishlistId={id}
-                  isReserved={reservationByItemId.has(item.id)}
-                />
-              ) : (
-                <div key={item.id} className="flex items-start gap-3 py-3.5">
+              return (
+                <div key={item.id} className="flex items-start gap-3 py-2.5">
                   <CircleMarker
                     state={reservationState}
                     itemId={item.id}
@@ -143,7 +145,7 @@ export default async function WishlistDetailPage({
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-3">
                         {item.price !== null && (
                           <span className="text-xs text-gray-700">
-                            {item.price.toLocaleString('ru-RU')} ₽
+                            {item.price.toLocaleString('ru-RU')} €
                           </span>
                         )}
                         {item.link && (
@@ -158,13 +160,18 @@ export default async function WishlistDetailPage({
                         )}
                       </div>
                     )}
-                    <ReservationControls
-                      itemId={item.id}
-                      wishlistId={id}
-                      state={reservationState}
-                      reserverName={reserverNameByItemId.get(item.id)}
-                    />
+                    {reservationState !== 'unreserved' && (
+                      <ReservationControls
+                        itemId={item.id}
+                        wishlistId={id}
+                        state={reservationState}
+                        reserverName={reserverNameByItemId.get(item.id)}
+                      />
+                    )}
                   </div>
+                  {reservationState === 'unreserved' && (
+                    <ReserveButton itemId={item.id} wishlistId={id} />
+                  )}
                 </div>
               )
             })}
@@ -194,7 +201,7 @@ export default async function WishlistDetailPage({
               <span className="text-xs text-gray-400">виден друзьям</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-4 w-4 shrink-0 rounded-full bg-gray-300" />
+              <div className="h-4 w-4 shrink-0 rounded-full border-2 border-gray-300" />
               <span className="text-xs text-gray-400">черновик, скрыт от друзей</span>
             </div>
           </div>

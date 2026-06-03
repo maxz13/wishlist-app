@@ -72,7 +72,7 @@ export default async function WishlistItemPage({
           <div className="mt-4 flex flex-col gap-2">
             {item.price !== null && (
               <p className="text-sm text-gray-700">
-                {item.price.toLocaleString('ru-RU')} ₽
+                {item.price.toLocaleString('ru-RU')} €
               </p>
             )}
             {item.link && (

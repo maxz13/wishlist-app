@@ -88,7 +88,7 @@ export function ItemEditForm({ item, wishlistId, backHref }: ItemEditFormProps) 
 
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
-            Цена ₽
+            Цена
           </span>
           <input
             name="price"
