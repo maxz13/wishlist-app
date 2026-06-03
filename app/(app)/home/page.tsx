@@ -33,10 +33,34 @@ type ItemActivityRow = {
     profiles: { id: string; name: string; surname: string }
   }
 }
+type ReservedActivityRow = {
+  id: string
+  created_at: string
+  reserved_by_user_id: string
+  wishlist_items: {
+    id: string
+    title: string
+    wishlists: { id: string; owner_id: string }
+  }
+}
+
 type ActivityEvent =
-  | { type: 'new_friend';   friendId: string; friendName: string; friendSurname: string; ts: string }
-  | { type: 'new_wishlist'; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_items';    count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_friend';              friendId: string; friendName: string; friendSurname: string; ts: string }
+  | { type: 'new_wishlist';            wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_items';               count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'wishlist_item_reserved';  itemId: string; itemTitle: string; label: string; ts: string }
+
+const RESERVED_LABELS = [
+  'Кто-то планирует подарить',
+  'Одно из ваших желаний зарезервировали',
+  'Кто-то присмотрел это желание',
+  'Это желание уже у кого-то на примете',
+] as const
+
+function reservedLabel(id: string): string {
+  const sum = id.replace(/-/g, '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return RESERVED_LABELS[sum % RESERVED_LABELS.length]
+}
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -155,8 +179,8 @@ export default async function HomePage() {
     }
   }
 
-  // Activity: new wishlists and new visible items by friends, last 7 days
-  const [newWishlistsResult, newItemsResult] = await Promise.all([
+  // Activity: new wishlists, new visible items by friends, and reservations on own items — last 7 days
+  const [newWishlistsResult, newItemsResult, newReservationsResult] = await Promise.all([
     friendIds.length > 0
       ? supabase
           .from('wishlists')
@@ -170,6 +194,12 @@ export default async function HomePage() {
       .from('wishlist_items')
       .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
       .eq('is_visible', true)
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('reservations')
+      .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id))')
+      .neq('reserved_by_user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false }),
   ])
@@ -232,7 +262,18 @@ export default async function HomePage() {
     }
   })
 
-  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents]
+  // wishlist_item_reserved: items owned by current user that were reserved by someone else
+  const reservedItemEvents: ActivityEvent[] = ((newReservationsResult.data ?? []) as unknown as ReservedActivityRow[])
+    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id)
+    .map((r) => ({
+      type:      'wishlist_item_reserved' as const,
+      itemId:    r.wishlist_items.id,
+      itemTitle: r.wishlist_items.title,
+      label:     reservedLabel(r.id),
+      ts:        r.created_at,
+    }))
+
+  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents]
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 4)
 
@@ -387,6 +428,11 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
+                </>)}
+
+                {event.type === 'wishlist_item_reserved' && (<>
+                  {event.label}<br />
+                  <span className="font-medium">{event.itemTitle}</span>
                 </>)}
 
                 <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
