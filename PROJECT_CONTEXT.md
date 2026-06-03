@@ -24,8 +24,8 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Wishlists: create, edit, visibility toggle (draft vs visible)
 - Wishlist items: add, reserve, reservation owner visibility
 - Birthday collection at registration
-- Bottom navigation: icon + label tabs, active state; profile tab shows avatar photo (circular, 24×24, blue border ring when active) or initials badge
-- Home feed ("Лента"): activity stream (top, 4 events) + Друзья · Мои вишлисты · Я подарю sections. "Дни рождения" section removed.
+- Bottom navigation: icon + label tabs, active state; nav height 74px; icon containers 28×28; SVG icons 23×23; central `+` button 64×64 (blue circle, raised `-mt-[18px]`); profile tab shows avatar photo (circular, 28×28, blue border ring when active) or initials badge; green dot (bottom-right of Friends icon) when pending incoming requests > 0; no top border; background `#fafafa`
+- Home feed ("Лента"): incoming friend requests section (compact horizontal card: avatar + name/username + green Принять + red Отклонить) rendered above activity stream; activity stream (top 4 events) + Друзья · Мои вишлисты · Я подарю sections. "Дни рождения" section removed.
 - Activity feed: new wishlists · new visible items (grouped by wishlist+day) · new friends — last 7 days, relative timestamps, all entities clickable; wrapped in `.grouped-card` with `.feed-bullet` (light-blue 8×8 circle) per row and `.grouped-card-divider` (90% centered) between rows
 - Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); live username search (2-char threshold, 300ms debounce, `search_profiles_by_username_prefix` RPC, browser Supabase client); search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />` preserved
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
@@ -42,18 +42,21 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Font: Inter via `next/font/google` (latin + cyrillic); `--font-inter`; Geist Mono for `font-mono`
 - Section headers: `.section-title` (1.0625rem / 600 / #111827) on all major headings. "Лента" not yet migrated.
 - Design system CSS (`app/globals.css`): `.section-title`, `.grouped-card`, `.feed-bullet`, `.grouped-card-divider`, `font-size: 16px !important` on all inputs/textarea/select (mobile zoom prevention)
-- Mobile PWA: viewport export in `app/layout.tsx` sets `maximumScale: 1, userScalable: false` — **this is what prevents Safari input zoom**; `bg-white` on both `html` and `body` prevents gray background on overscroll
+- Mobile PWA: viewport export in `app/layout.tsx` sets `maximumScale: 1, userScalable: false` — **this is what prevents Safari input zoom**; `bg-[#fafafa]` on both `html` and `body`; `.grouped-card` stays `#ffffff` (cards remain pure white against the subtle gray background)
+- iOS Keychain autocomplete fix: `register-form.tsx` — email field has `autoComplete="email username"` (marks it as the account identifier), username field has `autoComplete="nickname"` (prevents Keychain from treating it as the login), password field has `autoComplete="new-password"`
+- Email confirmation: Resend configured as custom SMTP provider in Supabase dashboard (`smtp.resend.com`, port 465, API key as password). Supabase built-in mailer is NOT used.
 
 ---
 
 ## Current focus
 
-V1 deployed to production. Core issue resolved: registration and Safari zoom fixed. Incoming friend requests now display correctly on the Friends page.
+V1 + friends system fully deployed. Session 2026-06-03 completed. All friend request flows, mobile polish, and visual refinements are live on `feature/friends-system`.
 
 Remaining work:
 1. Apply pending migrations to remote (see Migrations table)
 2. Remove debug logging from `registerAction` once production registration confirmed working
 3. Visual pass — wishlist detail page, friend detail page
+4. Merge `feature/friends-system` → `main` when ready for full production release
 4. Update `app/layout.tsx` metadata from stale CNA defaults to "SimpleWish"
 
 ---
@@ -100,6 +103,8 @@ Remaining work:
 - **`friendships` RLS:** `USING (user_id = auth.uid())` — only current user's rows returned.
 - **`accept_invite` gap:** does not clean up `friend_requests` when users connect via invite link. Cleanup SQL: `DELETE FROM friend_requests fr WHERE EXISTS (SELECT 1 FROM friendships f WHERE f.user_id = fr.from_user_id AND f.friend_id = fr.to_user_id)`.
 - **`profiles_select_incoming_request_sender` RLS bug (fixed 2026-06-03):** The policy originally used `fr.from_user_id = fr.id` instead of `fr.from_user_id = profiles.id`. This caused the EXISTS subquery to never match, so sender profiles were invisible under RLS. Incoming requests existed in `friend_requests` but the profiles query silently returned `[]`. Fixed by correcting the USING clause on production. The `friend_requests` query and JS filtering were always correct — the bug was purely in the DB policy expression.
+- **Bottom nav sizing system (2026-06-03):** nav `h-[74px]`, `iconBox` `h-7 w-7` (28px), SVG icons `h-[23px] w-[23px]` (23px), `PlusIcon` `h-7 w-7` (28px), central button `h-16 w-16` (64px), raise `-mt-[18px]`. Profile avatar wrapper must match `iconBox` (`h-7 w-7`) — it was previously hardcoded `h-6 w-6` and missed during scaling (fixed). Page `pb-16` in layout intentionally NOT updated yet — pending visual QA.
+- **App background:** `#fafafa` (`:root --background`, `html`, `body`). Cards (`.grouped-card`) stay `#ffffff`. Auth pages unaffected (they render outside `(app)` layout).
 - **PostgREST schema cache:** after applying functions via SQL editor, run `NOTIFY pgrst, 'reload schema';` to make them immediately available. Without this, RPCs return `PGRST125`.
 - **`migration repair --linked` works without Docker.**
 - **Docker not available in dev** — `supabase db diff/dump/reset` require Docker.
