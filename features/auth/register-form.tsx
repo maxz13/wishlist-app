@@ -127,11 +127,12 @@ export function RegisterForm({ next }: { next?: string }) {
         <input
           id="birthday"
           name="birthday"
-          type="date"
+          type="text"
+          inputMode="numeric"
+          placeholder="ДД.ММ.ГГГГ"
           required
           value={birthday}
           onChange={(e) => setBirthday(e.target.value)}
-          max={new Date().toISOString().split('T')[0]}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.birthday && (

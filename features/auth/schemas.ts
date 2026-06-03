@@ -16,16 +16,26 @@ export const RegisterSchema = z.object({
     .refine((v) => !/__/.test(v), 'Нельзя использовать двойное подчёркивание __'),
   email: z.string().email('Введите корректный email').trim(),
   password: z.string().min(8, 'Пароль должен содержать не менее 8 символов'),
-  birthday: z
-    .string()
-    .min(1, 'Введите дату рождения')
-    .refine(
-      (val) => {
-        const date = new Date(val)
-        return !isNaN(date.getTime()) && date <= new Date()
-      },
-      'Введите корректную дату рождения'
-    ),
+  birthday: z.preprocess(
+    (val) => {
+      if (typeof val !== 'string') return val
+      const v = val.trim()
+      // Convert DD.MM.YYYY → YYYY-MM-DD before validation
+      return /^\d{2}\.\d{2}\.\d{4}$/.test(v)
+        ? `${v.slice(6)}-${v.slice(3, 5)}-${v.slice(0, 2)}`
+        : v
+    },
+    z
+      .string()
+      .min(1, 'Введите дату рождения')
+      .refine(
+        (val) => {
+          const date = new Date(val)
+          return !isNaN(date.getTime()) && date <= new Date()
+        },
+        'Введите корректную дату рождения'
+      )
+  ),
 })
 
 export type LoginFormState =

@@ -72,7 +72,8 @@ export function ProfileForm({ profile }: Props) {
   // Supabase returns `date` as "YYYY-MM-DD"; strip any unexpected timezone suffix
   // so input type="date" always receives a valid date value or empty string.
   const [birthday, setBirthday] = useState(
-    profile.birthday ? (profile.birthday.slice(0, 10)) : ''
+    // Convert stored YYYY-MM-DD → DD.MM.YYYY for display
+    profile.birthday ? profile.birthday.slice(0, 10).split('-').reverse().join('.') : ''
   )
   const [formState, setFormState] = useState<UpdateProfileState>(undefined)
   const [pending, startTransition] = useTransition()
@@ -103,7 +104,8 @@ export function ProfileForm({ profile }: Props) {
     const fd = new FormData()
     fd.set('name', name)
     fd.set('surname', surname)
-    fd.set('birthday', birthday)
+    // Convert DD.MM.YYYY → YYYY-MM-DD before sending to server
+    fd.set('birthday', birthday ? birthday.split('.').reverse().join('-') : '')
     startTransition(async () => {
       const result = await updateProfileAction(undefined, fd)
       setFormState(result)
@@ -320,7 +322,9 @@ export function ProfileForm({ profile }: Props) {
               <label className="text-xs font-medium text-gray-500">День рождения</label>
               <input
                 name="birthday"
-                type="date"
+                type="text"
+                inputMode="numeric"
+                placeholder="ДД.ММ.ГГГГ"
                 value={birthday}
                 onChange={(e) => setBirthday(e.target.value)}
                 className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
