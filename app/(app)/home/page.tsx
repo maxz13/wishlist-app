@@ -43,12 +43,22 @@ type ReservedActivityRow = {
     wishlists: { id: string; owner_id: string }
   }
 }
+type AccessGrantedRow = {
+  created_at: string
+  wishlists: {
+    id: string
+    title: string
+    owner_id: string
+    profiles: { id: string; name: string; surname: string }
+  }
+}
 
 type ActivityEvent =
-  | { type: 'new_friend';              friendId: string; friendName: string; friendSurname: string; ts: string }
-  | { type: 'new_wishlist';            wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_items';               count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'wishlist_item_reserved';  itemId: string; itemTitle: string; label: string; ts: string }
+  | { type: 'new_friend';               friendId: string; friendName: string; friendSurname: string; ts: string }
+  | { type: 'new_wishlist';             wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_items';                count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; label: string; ts: string }
+  | { type: 'wishlist_access_granted';  wishlistId: string; wishlistTitle: string; ownerId: string; ownerName: string; ts: string }
 
 const RESERVED_LABELS = [
   'Кто-то планирует подарить',
@@ -179,8 +189,9 @@ export default async function HomePage() {
     }
   }
 
-  // Activity: new wishlists, new visible items by friends, and reservations on own items — last 7 days
-  const [newWishlistsResult, newItemsResult, newReservationsResult] = await Promise.all([
+  // Activity: new wishlists, new visible items by friends, reservations on own items,
+  // and private wishlist access grants — last 7 days
+  const [newWishlistsResult, newItemsResult, newReservationsResult, accessGrantedResult] = await Promise.all([
     friendIds.length > 0
       ? supabase
           .from('wishlists')
@@ -200,6 +211,12 @@ export default async function HomePage() {
       .from('reservations')
       .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id))')
       .neq('reserved_by_user_id', user!.id)
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('wishlist_access')
+      .select('created_at, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
+      .eq('user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false }),
   ])
@@ -273,7 +290,19 @@ export default async function HomePage() {
       ts:        r.created_at,
     }))
 
-  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents]
+  // wishlist_access_granted: current user was added to a friend's private wishlist
+  const accessGrantedEvents: ActivityEvent[] = ((accessGrantedResult.data ?? []) as unknown as AccessGrantedRow[])
+    .filter((r) => r.wishlists.owner_id !== user!.id)
+    .map((r) => ({
+      type:          'wishlist_access_granted' as const,
+      wishlistId:    r.wishlists.id,
+      wishlistTitle: r.wishlists.title,
+      ownerId:       r.wishlists.owner_id,
+      ownerName:     r.wishlists.profiles.name,
+      ts:            r.created_at,
+    }))
+
+  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents, ...accessGrantedEvents]
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 4)
 
@@ -433,6 +462,16 @@ export default async function HomePage() {
                 {event.type === 'wishlist_item_reserved' && (<>
                   {event.label}<br />
                   <span className="font-medium">{event.itemTitle}</span>
+                </>)}
+
+                {event.type === 'wishlist_access_granted' && (<>
+                  <Link href={`/friends/${event.ownerId}`} className="font-medium">
+                    {event.ownerName}
+                  </Link>
+                  {' добавил вас в приватный вишлист'}<br />
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
                 </>)}
 
                 <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
