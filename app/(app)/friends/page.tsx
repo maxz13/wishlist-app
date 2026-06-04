@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateInviteSection } from '@/features/friends/create-invite-section'
@@ -25,6 +26,7 @@ type SenderProfile = {
 export default async function FriendsPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
   const today = new Date()
 
   const { data: friendships } = await supabase

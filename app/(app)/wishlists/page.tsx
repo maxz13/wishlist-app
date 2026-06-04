@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -17,6 +18,7 @@ export default async function WishlistsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [activeResult, archivedResult, sharedResult] = await Promise.all([
     supabase

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { pluralRu, friendBirthdayLine } from '@/lib/format'
@@ -96,6 +97,7 @@ function moreItemsLabel(n: number, one: string, few: string, many: string): stri
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const today        = new Date()
   const sevenDaysAgo = new Date(today.getTime() - 7 * 86_400_000).toISOString()
