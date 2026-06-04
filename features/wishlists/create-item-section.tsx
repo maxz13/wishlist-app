@@ -81,7 +81,7 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
 
   return (
     <div
-      className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3"
+      className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 shadow-sm"
       onBlur={handleContainerBlur}
     >
       <div>

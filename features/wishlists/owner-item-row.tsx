@@ -94,7 +94,7 @@ export function OwnerItemRow({
   const showEditFields = isExpanded && !confirming
 
   return (
-    <div className={`flex items-start gap-3 ${showEditFields ? 'rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3' : `py-2.5${isReserved ? ' -mx-2 rounded-lg bg-green-50 px-2' : ''}`}`}>
+    <div className={`flex items-start gap-3 ${showEditFields ? 'rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 shadow-sm' : `py-2.5${isReserved ? ' -mx-2 rounded-lg bg-green-50 px-2' : ''}`}`}>
       <div className="min-w-0 flex-1">
         {showEditFields && editingTitle ? (
           <input
@@ -102,7 +102,7 @@ export function OwnerItemRow({
             value={titleValue}
             onChange={e => setTitleValue(e.target.value)}
             autoFocus
-            className={`w-full bg-transparent text-[15px] font-medium leading-snug focus:outline-none ${
+            className={`w-full bg-transparent text-[15px] font-medium leading-snug border-b border-transparent pb-0.5 focus:border-gray-300 focus:outline-none ${
               isDraft ? 'text-gray-400' : 'text-gray-900'
             }`}
           />
@@ -137,9 +137,10 @@ export function OwnerItemRow({
         )}
 
         <div
-          className={`overflow-hidden transition-all duration-150 ease-in-out ${
+          className={`overflow-hidden ${
             showEditFields ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           }`}
+          style={{ transition: 'max-height 200ms ease-out, opacity 200ms ease-out' }}
         >
           <form
             ref={formRef}

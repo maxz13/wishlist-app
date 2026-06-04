@@ -45,7 +45,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Wishlist archiving: archive/restore from detail page (bottom of page); invisible to friends; muted "Архив" section at bottom of wishlists page in its own `grouped-card`
 - Wishlists page (`/wishlists`): `section-title` h1; active wishlists in `grouped-card` with item counts; visibility indicators on cards; "Доступные вам" section for private wishlists shared with the user via selected_friends access; archive in separate `grouped-card` with muted styling
 - Wishlist item visibility: new items default to `is_visible: true`; toggle via "Спрятать" / "Показать" text button always visible in each owner row (right of title, left of ⋯); hidden items rendered in `text-gray-400`; no draft legend
-- Wishlist owner item row (⋯ menu): Переименовать · Удалить
+- Wishlist owner item row (⋯ menu): Удалить only ("Переименовать" removed — title edits directly in the card)
 - Wishlist-level visibility: three modes — `all_friends` (default), `private`, `selected_friends`. Controlled via `WishlistAccessSection` at the bottom of the wishlist detail page (owner only), between item list and archive. Collapsed shows current mode label + "Изменить"; expanded shows radio selector + friend checklist (avatars + initials fallback). If `selected_friends` with 0 friends selected, treated as `private`. Friend avatars (h-6 w-6 strip in collapsed, h-7 w-7 in checklist).
 - Wishlist card visibility indicators (owner view): `private` → `Lock` icon + "Скрыт от всех"; `selected_friends` → "Виден N другу/друзьям" (pluralRu)
 - "Доступные вам" section on wishlists page: shows `selected_friends` wishlists shared with the current user; each card is read-only with "🔒 По приглашению" badge; disappears automatically if access revoked or visibility changed
@@ -66,13 +66,21 @@ Session 2026-06-04 complete. All changes deployed to production on `main`.
 Auth guard fix (2026-06-04):
 - Added `if (!user) redirect('/login')` to `HomePage`, `WishlistsPage`, `FriendsPage` immediately after `getUser()`
 - Root cause: Next.js App Router renders layout and page as concurrent Server Components — the layout's redirect alone does not prevent the page from crashing on null user
-- `ProfilePage` already had this guard; the three app pages did not
-- Diagnosed via stale production server (zombie `next-server` process after `.next/` was deleted) — CSS/JS chunks were 500ing, causing skeleton lock and unstyled layout
+
+Wishlist item editing redesign (2026-06-04):
+- Edit card: `rounded-2xl border border-gray-200 bg-gray-50 shadow-sm px-3 py-3`; page padding `px-4 → px-5`
+- Title tap-to-edit: first tap opens card; second tap on title enters edit mode (`editingTitle` state); title input gets `border-b border-transparent focus:border-gray-300` cue
+- No Save button; autosave on close via parent-signal approach (`requestClose` / `onSaveFailed` props, `closingId` in `OwnerItemList`)
+- Card closes only on successful save; stays open with per-field validation errors on failure
+- Outside click and tapping another item both trigger save — "close first, open second on next tap" behavior
+- "Переименовать" removed from ⋯ menu
+- Create card unified with edit card: same visual style, same field layout (title + price/link indented `pl-3`), collapses and shows new item on success
+- Animation: `transition: max-height 200ms ease-out, opacity 200ms ease-out` (inline style, avoids Tailwind `transition-all` jank)
 
 Remaining work:
 1. Remove debug `console.error` in `registerAction` (`features/auth/actions.ts`) — was added during registration debugging, still present
 2. Update `app/layout.tsx` metadata: `title: "Create Next App"` → "SimpleWish"
-3. Visual pass — wishlist detail page, friend detail page
+3. Visual pass — friend detail page
 4. `<h1>Лента</h1>` uses `text-xl font-semibold` instead of `.section-title` — deferred
 
 ---
@@ -127,6 +135,9 @@ Remaining work:
 - **Bottom nav sizing system:** nav `h-[74px]`, `iconBox` `h-7 w-7` (28px), SVG icons `h-[23px] w-[23px]` (23px), `PlusIcon` `h-7 w-7` (28px), central button `h-16 w-16` (64px), raise `-mt-[18px]`. Profile avatar wrapper must match `iconBox` (`h-7 w-7`).
 - **App background:** `#fafafa` (`:root --background`, `html`, `body`). Cards (`.grouped-card`) stay `#ffffff`. Auth pages unaffected.
 - **Auth guard pattern:** Every app page that calls `getUser()` must include `if (!user) redirect('/login')` immediately after, before any `user.id` access. The layout's redirect alone is not sufficient — layout and page render concurrently as Server Components, so the page can crash on null user before the layout redirect fires.
+- **Wishlist item edit card pattern:** `OwnerItemRow` receives `requestClose: boolean` + `onSaveFailed: () => void` from `OwnerItemList`. When `requestClose` fires, the row saves via `formRef` and calls `onCollapse()` on success or `onSaveFailed()` on failure. Parent uses `closingId` state to signal close without directly setting `expandedId = null`. Outside-click sets `closingId`; tapping another item sets `closingId` on the open item without opening the new one. `formRef` attached to the `<form>` so save can be triggered without a submit event.
+- **Wishlist item title editing:** `editingTitle` boolean + `titleValue` string state in `OwnerItemRow`. A `useEffect([isExpanded, item.title])` resets both when card closes. Hidden `<input type="hidden" name="title" value={titleValue} />` always present in the form — server action receives correct title whether editing or not. Title input uses `border-b border-transparent focus:border-gray-300 pb-0.5` for the edit-mode underline cue.
+- **Create item card:** `CreateItemSection` uses controlled `title/price/link` state, collapses on success (`collapse()` resets all fields). Container `onBlur` with `relatedTarget` containment check prevents collapse when focus moves between fields within the card.
 - **PostgREST schema cache:** after applying functions via SQL editor, run `NOTIFY pgrst, 'reload schema';` to make them immediately available. Without this, RPCs return `PGRST125`.
 - **`migration repair --linked` works without Docker.**
 - **Docker not available in dev** — `supabase db diff/dump/reset` require Docker.
