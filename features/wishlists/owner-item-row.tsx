@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   deleteWishlistItemAction,
@@ -22,6 +22,8 @@ interface OwnerItemRowProps {
   isExpanded: boolean
   onExpand: () => void
   onCollapse: () => void
+  requestClose: boolean
+  onSaveFailed: () => void
 }
 
 export function OwnerItemRow({
@@ -31,6 +33,8 @@ export function OwnerItemRow({
   isExpanded,
   onExpand,
   onCollapse,
+  requestClose,
+  onSaveFailed,
 }: OwnerItemRowProps) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
@@ -42,6 +46,7 @@ export function OwnerItemRow({
   const [visibilityPending, startVisibilityTransition] = useTransition()
   const [savePending, startSaveTransition] = useTransition()
   const anyPending = deletePending || visibilityPending || savePending
+  const formRef = useRef<HTMLFormElement>(null)
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(item.title)
@@ -70,16 +75,20 @@ export function OwnerItemRow({
     })
   }
 
-  function handleSave(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  function doSave(e?: React.FormEvent<HTMLFormElement>) {
+    e?.preventDefault()
+    if (savePending || !formRef.current) return
     setSaveState(undefined)
-    const formData = new FormData(e.currentTarget)
+    const formData = new FormData(formRef.current)
     startSaveTransition(async () => {
       const result = await updateWishlistItemAction(item.id, wishlistId, formData)
       if (result?.success) onCollapse()
-      else setSaveState(result)
+      else { setSaveState(result); onSaveFailed() }
     })
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (requestClose) doSave() }, [requestClose])
 
   const isDraft = !item.is_visible
   const showEditFields = isExpanded && !confirming
@@ -117,6 +126,10 @@ export function OwnerItemRow({
           </p>
         )}
 
+        {showEditFields && saveState?.errors?.title && (
+          <p className="mt-0.5 text-xs text-red-600">{saveState.errors.title[0]}</p>
+        )}
+
         {!confirming && item.price !== null && !showEditFields && (
           <p className={`mt-0.5 text-sm ${isDraft ? 'text-gray-400' : 'text-gray-700'}`}>
             {item.price.toLocaleString('ru-RU')} €
@@ -129,43 +142,42 @@ export function OwnerItemRow({
           }`}
         >
           <form
+            ref={formRef}
             key={showEditFields ? 'open' : 'closed'}
-            onSubmit={handleSave}
+            onSubmit={doSave}
             className="pb-1 pt-3"
           >
             <input type="hidden" name="title" value={titleValue} />
             <div className="flex flex-col gap-3 pl-3">
-              <input
-                name="price"
-                type="text"
-                inputMode="decimal"
-                placeholder="299 €"
-                defaultValue={item.price ?? ''}
-                className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
-              />
-              <input
-                name="link"
-                type="url"
-                placeholder="Ссылка на товар"
-                defaultValue={item.link ?? ''}
-                className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
-              />
-            </div>
-            {(saveState?.errors?.title || saveState?.errors?.price || saveState?.errors?.link || (saveState?.message && !saveState.success)) && (
-              <div className="mt-1 flex flex-col gap-0.5">
-                {saveState?.errors?.title && <p className="text-xs text-red-600">{saveState.errors.title[0]}</p>}
-                {saveState?.errors?.price && <p className="text-xs text-red-600">{saveState.errors.price[0]}</p>}
-                {saveState?.errors?.link && <p className="text-xs text-red-600">{saveState.errors.link[0]}</p>}
-                {saveState?.message && !saveState.success && <p className="text-xs text-red-600">{saveState.message}</p>}
+              <div>
+                <input
+                  name="price"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="299 €"
+                  defaultValue={item.price ?? ''}
+                  className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                />
+                {saveState?.errors?.price && (
+                  <p className="mt-0.5 text-xs text-red-600">{saveState.errors.price[0]}</p>
+                )}
               </div>
+              <div>
+                <input
+                  name="link"
+                  type="url"
+                  placeholder="Ссылка на товар"
+                  defaultValue={item.link ?? ''}
+                  className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                />
+                {saveState?.errors?.link && (
+                  <p className="mt-0.5 text-xs text-red-600">{saveState.errors.link[0]}</p>
+                )}
+              </div>
+            </div>
+            {saveState?.message && !saveState.success && (
+              <p className="mt-1 pl-3 text-xs text-red-600">{saveState.message}</p>
             )}
-            <button
-              type="submit"
-              disabled={savePending}
-              className="mt-2.5 pl-3 text-sm font-medium text-[#3b82f6] disabled:opacity-40"
-            >
-              {savePending ? 'Сохранение…' : 'Сохранить'}
-            </button>
           </form>
         </div>
 

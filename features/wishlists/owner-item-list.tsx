@@ -21,18 +21,19 @@ export function OwnerItemList({
   reservedItemIds: string[]
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [closingId, setClosingId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (expandedId === null) return
     function handlePointerDown(e: PointerEvent) {
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
-        setExpandedId(null)
+        if (closingId === null) setClosingId(expandedId)
       }
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [expandedId])
+  }, [expandedId, closingId])
 
   return (
     <div ref={listRef} className="divide-y divide-gray-100">
@@ -43,8 +44,16 @@ export function OwnerItemList({
           wishlistId={wishlistId}
           isReserved={reservedItemIds.includes(item.id)}
           isExpanded={expandedId === item.id}
-          onExpand={() => setExpandedId(item.id)}
-          onCollapse={() => setExpandedId(null)}
+          onExpand={() => {
+            if (expandedId !== null && expandedId !== item.id) {
+              if (closingId === null) setClosingId(expandedId)
+            } else if (closingId === null) {
+              setExpandedId(item.id)
+            }
+          }}
+          onCollapse={() => { setExpandedId(null); setClosingId(null) }}
+          requestClose={closingId === item.id}
+          onSaveFailed={() => setClosingId(null)}
         />
       ))}
     </div>
