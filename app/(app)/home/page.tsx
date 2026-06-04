@@ -32,6 +32,7 @@ type ItemActivityRow = {
     title: string
     owner_id: string
     is_archived: boolean
+    visibility: string
     profiles: { id: string; name: string; surname: string }
   }
 }
@@ -42,7 +43,7 @@ type ReservedActivityRow = {
   wishlist_items: {
     id: string
     title: string
-    wishlists: { id: string; owner_id: string; title: string; is_archived: boolean }
+    wishlists: { id: string; owner_id: string; title: string; is_archived: boolean; visibility: string }
   }
 }
 type AccessGrantedRow = {
@@ -135,14 +136,14 @@ export default async function HomePage() {
       .eq('reserved_by_user_id', user!.id),
     supabase
       .from('wishlist_items')
-      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, is_archived, profiles!inner(id, name, surname))')
+      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, is_archived, visibility, profiles!inner(id, name, surname))')
       .eq('is_visible', true)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(100),
     supabase
       .from('reservations')
-      .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id, title, is_archived))')
+      .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id, title, is_archived, visibility))')
       .neq('reserved_by_user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
@@ -215,6 +216,7 @@ export default async function HomePage() {
         .select('id, title, created_at, profiles!inner(id, name, surname)')
         .in('owner_id', friendIds)
         .eq('is_archived', false)
+        .eq('visibility', 'all_friends')
         .gte('created_at', sevenDaysAgo)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -299,7 +301,7 @@ export default async function HomePage() {
 
   const newWishlistsRaw = (newWishlistsResult.data ?? []) as unknown as WishlistActivityRow[]
   const newItemsRaw     = ((newItemsResult.data ?? []) as unknown as ItemActivityRow[])
-    .filter((item) => item.wishlists.owner_id !== user!.id && !item.wishlists.is_archived)
+    .filter((item) => item.wishlists.owner_id !== user!.id && !item.wishlists.is_archived && item.wishlists.visibility === 'all_friends')
 
   // --- Build activity events ---
 
@@ -358,7 +360,7 @@ export default async function HomePage() {
 
   // wishlist_item_reserved: items owned by current user that were reserved by someone else
   const reservedItemEvents: ActivityEvent[] = ((newReservationsResult.data ?? []) as unknown as ReservedActivityRow[])
-    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived)
+    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived && r.wishlist_items.wishlists.visibility === 'all_friends')
     .map((r) => ({
       type:          'wishlist_item_reserved' as const,
       itemId:        r.wishlist_items.id,
@@ -381,7 +383,7 @@ export default async function HomePage() {
       ts:            r.created_at,
     }))
 
-  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents, ...accessGrantedEvents]
+  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents]
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 4)
 
