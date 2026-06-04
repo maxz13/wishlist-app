@@ -2,6 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Gift } from 'lucide-react'
 import { reserveItemAction } from './actions'
 import type { ReservationState } from './reservation-controls'
 
@@ -40,7 +41,11 @@ export function CircleMarker({ state, itemId, wishlistId }: CircleMarkerProps) {
   }
 
   if (state === 'other') {
-    return <div className="mt-0.5 h-5 w-5 shrink-0 rounded-full bg-gray-300" />
+    return (
+      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100">
+        <Gift size={10} className="text-gray-400" />
+      </div>
+    )
   }
 
   if (itemId && wishlistId) {

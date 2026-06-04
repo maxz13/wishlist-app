@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Gift } from 'lucide-react'
 import { unreserveItemAction } from './actions'
 
 export type ReservationState = 'unreserved' | 'mine' | 'other'
@@ -37,9 +38,10 @@ export function ReservationControls({
 
   if (state === 'other') {
     return (
-      <p className="mt-1 text-xs text-gray-400">
-        {reserverName ? `Подарит ${reserverName}` : 'Зарезервировано'}
-      </p>
+      <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+        <Gift size={12} />
+        <span>{reserverName ? `Подарит ${reserverName}` : 'Зарезервировано'}</span>
+      </div>
     )
   }
 
@@ -47,7 +49,10 @@ export function ReservationControls({
     return (
       <div className="mt-1 flex flex-col gap-0.5">
         <div className="flex items-center gap-3">
-          <p className="text-xs text-green-700">Вы зарезервировали</p>
+          <div className="flex items-center gap-1 text-xs text-green-700">
+            <Gift size={12} />
+            <span>Зарезервировано вами</span>
+          </div>
           <button
             type="button"
             onClick={handleUnreserve}

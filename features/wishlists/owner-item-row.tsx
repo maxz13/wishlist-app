@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Gift } from 'lucide-react'
 import {
   deleteWishlistItemAction,
   toggleWishlistItemVisibilityAction,
@@ -183,7 +184,10 @@ export function OwnerItemRow({
         </div>
 
         {isReserved && !confirming && !showEditFields && (
-          <p className="mt-0.5 text-xs text-gray-500">Друг подарит</p>
+          <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+            <Gift size={12} />
+            <span>Подарит кто-то из друзей</span>
+          </div>
         )}
 
         {visibilityError && !confirming && (
