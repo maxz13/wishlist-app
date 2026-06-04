@@ -61,15 +61,13 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
-Session 2026-06-03 complete. All features deployed to production on `main`.
+Session 2026-06-04 complete. All changes deployed to production on `main`.
 
-Performance pass complete (same session):
-- Added `loading.tsx` route skeletons for home, friends, wishlists, profile, wishlist detail, friend detail
-- Instrumented layout + Home page with temporary server-side `[PERF]` logs, measured production-mode renders
-- Found sequential Supabase round-trips as the main bottleneck (not query speed)
-- Parallelized Home page queries into two `Promise.all` rounds + one sequential tail
-- Warm Home render: ~766ms → ~253ms (−67%). Cold: ~1062ms → ~495ms (−53%)
-- No RLS, schema, or business logic changes. Instrumentation removed. See `PERFORMANCE_CONTEXT.md`.
+Auth guard fix (2026-06-04):
+- Added `if (!user) redirect('/login')` to `HomePage`, `WishlistsPage`, `FriendsPage` immediately after `getUser()`
+- Root cause: Next.js App Router renders layout and page as concurrent Server Components — the layout's redirect alone does not prevent the page from crashing on null user
+- `ProfilePage` already had this guard; the three app pages did not
+- Diagnosed via stale production server (zombie `next-server` process after `.next/` was deleted) — CSS/JS chunks were 500ing, causing skeleton lock and unstyled layout
 
 Remaining work:
 1. Remove debug `console.error` in `registerAction` (`features/auth/actions.ts`) — was added during registration debugging, still present
@@ -128,6 +126,7 @@ Remaining work:
 - **`profiles_select_incoming_request_sender` RLS bug (fixed 2026-06-03):** policy originally used `fr.from_user_id = fr.id` instead of `fr.from_user_id = profiles.id`. Fixed on production.
 - **Bottom nav sizing system:** nav `h-[74px]`, `iconBox` `h-7 w-7` (28px), SVG icons `h-[23px] w-[23px]` (23px), `PlusIcon` `h-7 w-7` (28px), central button `h-16 w-16` (64px), raise `-mt-[18px]`. Profile avatar wrapper must match `iconBox` (`h-7 w-7`).
 - **App background:** `#fafafa` (`:root --background`, `html`, `body`). Cards (`.grouped-card`) stay `#ffffff`. Auth pages unaffected.
+- **Auth guard pattern:** Every app page that calls `getUser()` must include `if (!user) redirect('/login')` immediately after, before any `user.id` access. The layout's redirect alone is not sufficient — layout and page render concurrently as Server Components, so the page can crash on null user before the layout redirect fires.
 - **PostgREST schema cache:** after applying functions via SQL editor, run `NOTIFY pgrst, 'reload schema';` to make them immediately available. Without this, RPCs return `PGRST125`.
 - **`migration repair --linked` works without Docker.**
 - **Docker not available in dev** — `supabase db diff/dump/reset` require Docker.
