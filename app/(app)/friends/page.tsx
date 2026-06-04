@@ -93,14 +93,29 @@ export default async function FriendsPage() {
 
   // Active wishlist counts per friend
   const friendWishlistCountMap = new Map<string, number>()
+  const friendItemCountMap = new Map<string, number>()
   if (friendIds.length > 0) {
-    const { data: counts } = await supabase
+    const { data: wishlistRows } = await supabase
       .from('wishlists')
-      .select('owner_id')
+      .select('id, owner_id')
       .in('owner_id', friendIds)
       .eq('is_archived', false)
-    for (const row of (counts ?? [])) {
+    const rows = (wishlistRows ?? []) as Array<{ id: string; owner_id: string }>
+    for (const row of rows) {
       friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
+    }
+    const allWishlistIds = rows.map(w => w.id)
+    if (allWishlistIds.length > 0) {
+      const wishlistIdToOwner = new Map(rows.map(w => [w.id, w.owner_id]))
+      const { data: itemRows } = await supabase
+        .from('wishlist_items')
+        .select('wishlist_id')
+        .in('wishlist_id', allWishlistIds)
+        .eq('is_visible', true)
+      for (const row of (itemRows ?? []) as Array<{ wishlist_id: string }>) {
+        const ownerId = wishlistIdToOwner.get(row.wishlist_id)
+        if (ownerId) friendItemCountMap.set(ownerId, (friendItemCountMap.get(ownerId) ?? 0) + 1)
+      }
     }
   }
 
@@ -130,10 +145,11 @@ export default async function FriendsPage() {
         <ul className="mt-6 grouped-card">
           {friends.map((friend, i) => {
             const count = friendWishlistCountMap.get(friend.id) ?? 0
+            const itemCount = friendItemCountMap.get(friend.id) ?? 0
             const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
             const subline = count === 0
               ? birthday
-              : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${birthday ? ` • ${birthday}` : ''}`
+              : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
             return (
               <li key={friend.id}>
                 {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}

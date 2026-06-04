@@ -72,11 +72,27 @@ Wishlist item editing redesign (2026-06-04):
 - Edit card: `rounded-2xl border border-gray-200 bg-gray-50 shadow-sm px-3 py-3`; page padding `px-4 → px-5`
 - Title tap-to-edit: first tap opens card; second tap on title enters edit mode (`editingTitle` state); title input gets `border-b border-transparent focus:border-gray-300` cue
 - No Save button; autosave on close via parent-signal approach (`requestClose` / `onSaveFailed` props, `closingId` in `OwnerItemList`)
-- Card closes only on successful save; stays open with per-field validation errors on failure
+- Card closes only on successful save; stays open with per-field validation errors on failure; errors appear under their corresponding fields
 - Outside click and tapping another item both trigger save — "close first, open second on next tap" behavior
-- "Переименовать" removed from ⋯ menu
+- "Переименовать" removed from ⋯ menu; title editing done directly in the card
 - Create card unified with edit card: same visual style, same field layout (title + price/link indented `pl-3`), collapses and shows new item on success
 - Animation: `transition: max-height 200ms ease-out, opacity 200ms ease-out` (inline style, avoids Tailwind `transition-all` jank)
+
+Reserved gift visibility improvements (2026-06-04):
+- Owner view: `Gift` icon (lucide-react, size 12) + "Подарит кто-то из друзей" (reserver never revealed to owner)
+- Friend view: `CircleMarker` `other` state = icon-circle (`bg-gray-100`, `Gift` size 10); `ReservationControls` `other` = icon + "Подарит {name}" or "Зарезервировано"; `mine` = icon + "Зарезервировано вами" + Отменить button
+
+Activity feed improvements (2026-06-04):
+- Archived/deleted wishlist filtering: `is_archived` added to nested wishlist selects in `new_items`, `reservations`, and `wishlist_access` queries; archived wishlists excluded from all event types
+- Reservation activity: `wishlistId` and `wishlistTitle` threaded through — event is now clickable (`/wishlists/{id}`); shows "Кто-то выбрал подарок: {itemTitle}" + "из «{wishlistTitle}»"
+- Feed copy restructured: name-first format, shorter labels; `new_wishlist` → "{name} создал вишлист"; `new_items` count=1 → "{name} добавил желание / {title} / в «{wishlist}»"; `new_items` count>1 → "{name} добавил N желаний / в «{wishlist}» / bullet list of titles"
+- `new_items` events include `titles: string[]` for bullet rendering; grouping key unchanged (`owner_id + wishlist_id + calendar_day`)
+
+Friend wishlist + item counts (2026-06-04):
+- Friends page and Home page friends section now show "N вишлиста · M желаний" subline
+- Home: Round 2 wishlist query changed to `select('id, owner_id')`; Round 3 expanded to `Promise.all` (item wishlists + friend item counts in parallel — no new serial hop)
+- Friends page: wishlist query extended to `select('id, owner_id')`; item count query added sequentially after
+- Item counts: only visible (`is_visible=true`) items in non-archived wishlists; if `itemCount === 0`, item count segment omitted
 
 Remaining work:
 1. Remove debug `console.error` in `registerAction` (`features/auth/actions.ts`) — was added during registration debugging, still present

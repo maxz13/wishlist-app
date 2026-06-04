@@ -31,6 +31,7 @@ type ItemActivityRow = {
     id: string
     title: string
     owner_id: string
+    is_archived: boolean
     profiles: { id: string; name: string; surname: string }
   }
 }
@@ -41,7 +42,7 @@ type ReservedActivityRow = {
   wishlist_items: {
     id: string
     title: string
-    wishlists: { id: string; owner_id: string }
+    wishlists: { id: string; owner_id: string; title: string; is_archived: boolean }
   }
 }
 type AccessGrantedRow = {
@@ -50,6 +51,7 @@ type AccessGrantedRow = {
     id: string
     title: string
     owner_id: string
+    is_archived: boolean
     profiles: { id: string; name: string; surname: string }
   }
 }
@@ -57,8 +59,8 @@ type AccessGrantedRow = {
 type ActivityEvent =
   | { type: 'new_friend';               friendId: string; friendName: string; friendSurname: string; ts: string }
   | { type: 'new_wishlist';             wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_items';                count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; label: string; ts: string }
+  | { type: 'new_items';                count: number; singleTitle: string | null; titles: string[]; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; wishlistId: string; wishlistTitle: string; label: string; ts: string }
   | { type: 'wishlist_access_granted';  wishlistId: string; wishlistTitle: string; ownerId: string; ownerName: string; ts: string }
 
 const RESERVED_LABELS = [
@@ -133,21 +135,21 @@ export default async function HomePage() {
       .eq('reserved_by_user_id', user!.id),
     supabase
       .from('wishlist_items')
-      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
+      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, is_archived, profiles!inner(id, name, surname))')
       .eq('is_visible', true)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(100),
     supabase
       .from('reservations')
-      .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id))')
+      .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id, title, is_archived))')
       .neq('reserved_by_user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(50),
     supabase
       .from('wishlist_access')
-      .select('created_at, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
+      .select('created_at, wishlists!inner(id, title, owner_id, is_archived, profiles!inner(id, name, surname))')
       .eq('user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
@@ -196,12 +198,12 @@ export default async function HomePage() {
         .in('id', friendIds)
         .order('name')
     })(),
-    // Friend wishlist counts (depends on friendIds)
+    // Friend wishlist counts + IDs (depends on friendIds)
     (async () => {
-      if (friendIds.length === 0) return { data: [] as Array<{ owner_id: string }> }
+      if (friendIds.length === 0) return { data: [] as Array<{ id: string; owner_id: string }> }
       return supabase
         .from('wishlists')
-        .select('owner_id')
+        .select('id, owner_id')
         .in('owner_id', friendIds)
         .eq('is_archived', false)
     })(),
@@ -257,28 +259,47 @@ export default async function HomePage() {
   const friends    = (friendProfilesResult.data ?? []) as Friend[]
   const profileById = new Map(friends.map((f) => [f.id, f]))
 
+  const friendWishlistRows = (friendWishlistsResult.data ?? []) as Array<{ id: string; owner_id: string }>
+  const wishlistIdToOwnerId = new Map(friendWishlistRows.map(w => [w.id, w.owner_id]))
+  const allFriendWishlistIds = friendWishlistRows.map(w => w.id)
   const friendWishlistCountMap = new Map<string, number>()
-  for (const row of (friendWishlistsResult.data ?? [])) {
+  for (const row of friendWishlistRows) {
     friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
   }
 
   const reservedItems = (reservedItemsResult.data ?? []) as Array<{ id: string; title: string; wishlist_id: string }>
 
-  // Round 3: "Я подарю" wishlists — depends on reservedItems from Round 2
-  let itemWishlists: Array<{ id: string; owner_id: string }> = []
-  if (reservedItems.length > 0) {
-    const itemWishlistIds = [...new Set(reservedItems.map((i) => i.wishlist_id))]
-    const { data } = await supabase
-      .from('wishlists')
-      .select('id, owner_id')
-      .in('id', itemWishlistIds)
-      .eq('is_archived', false)
-    itemWishlists = (data ?? []) as typeof itemWishlists
+  // Round 3: run in parallel — "Я подарю" wishlists + friend item counts
+  const [itemWishlistsResult, friendItemCountsResult] = await Promise.all([
+    (async () => {
+      if (reservedItems.length === 0) return { data: [] as Array<{ id: string; owner_id: string }> }
+      const itemWishlistIds = [...new Set(reservedItems.map((i) => i.wishlist_id))]
+      return supabase
+        .from('wishlists')
+        .select('id, owner_id')
+        .in('id', itemWishlistIds)
+        .eq('is_archived', false)
+    })(),
+    (async () => {
+      if (allFriendWishlistIds.length === 0) return { data: [] as Array<{ wishlist_id: string }> }
+      return supabase
+        .from('wishlist_items')
+        .select('wishlist_id')
+        .in('wishlist_id', allFriendWishlistIds)
+        .eq('is_visible', true)
+    })(),
+  ])
+
+  const itemWishlists = (itemWishlistsResult.data ?? []) as Array<{ id: string; owner_id: string }>
+  const friendItemCountMap = new Map<string, number>()
+  for (const row of (friendItemCountsResult.data ?? []) as Array<{ wishlist_id: string }>) {
+    const ownerId = wishlistIdToOwnerId.get(row.wishlist_id)
+    if (ownerId) friendItemCountMap.set(ownerId, (friendItemCountMap.get(ownerId) ?? 0) + 1)
   }
 
   const newWishlistsRaw = (newWishlistsResult.data ?? []) as unknown as WishlistActivityRow[]
   const newItemsRaw     = ((newItemsResult.data ?? []) as unknown as ItemActivityRow[])
-    .filter((item) => item.wishlists.owner_id !== user!.id)
+    .filter((item) => item.wishlists.owner_id !== user!.id && !item.wishlists.is_archived)
 
   // --- Build activity events ---
 
@@ -326,6 +347,7 @@ export default async function HomePage() {
       type:          'new_items' as const,
       count:         group.length,
       singleTitle:   group.length === 1 ? first.title : null,
+      titles:        group.map(i => i.title),
       wishlistId:    first.wishlist_id,
       wishlistTitle: first.wishlists.title,
       friendId:      first.wishlists.profiles.id,
@@ -336,18 +358,20 @@ export default async function HomePage() {
 
   // wishlist_item_reserved: items owned by current user that were reserved by someone else
   const reservedItemEvents: ActivityEvent[] = ((newReservationsResult.data ?? []) as unknown as ReservedActivityRow[])
-    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id)
+    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived)
     .map((r) => ({
-      type:      'wishlist_item_reserved' as const,
-      itemId:    r.wishlist_items.id,
-      itemTitle: r.wishlist_items.title,
-      label:     reservedLabel(r.id),
-      ts:        r.created_at,
+      type:          'wishlist_item_reserved' as const,
+      itemId:        r.wishlist_items.id,
+      itemTitle:     r.wishlist_items.title,
+      wishlistId:    r.wishlist_items.wishlists.id,
+      wishlistTitle: r.wishlist_items.wishlists.title,
+      label:         reservedLabel(r.id),
+      ts:            r.created_at,
     }))
 
   // wishlist_access_granted: current user was added to a friend's private wishlist
   const accessGrantedEvents: ActivityEvent[] = ((accessGrantedResult.data ?? []) as unknown as AccessGrantedRow[])
-    .filter((r) => r.wishlists.owner_id !== user!.id)
+    .filter((r) => r.wishlists.owner_id !== user!.id && !r.wishlists.is_archived)
     .map((r) => ({
       type:          'wishlist_access_granted' as const,
       wishlistId:    r.wishlists.id,
@@ -451,41 +475,48 @@ export default async function HomePage() {
                 </>)}
 
                 {event.type === 'new_wishlist' && (<>
-                  {'Новый вишлист '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                  {' — '}
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
+                  </Link>
+                  {' создал вишлист'}<br />
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
                   </Link>
                 </>)}
 
                 {event.type === 'new_items' && event.count === 1 && (<>
-                  {`«${event.singleTitle}» в `}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                  {' — '}
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
+                  </Link>
+                  {' добавил желание'}<br />
+                  <span className="font-medium">{event.titles[0]}</span><br />
+                  {'в '}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
                   </Link>
                 </>)}
 
                 {event.type === 'new_items' && event.count > 1 && (<>
-                  {`${event.count} ${pluralRu(event.count, 'новое желание', 'новых желания', 'новых желаний')} в `}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                  {' — '}
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
+                  {` добавил ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}<br />
+                  {'в '}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
+                  {event.titles.map((t, i) => (
+                    <span key={i}><br />{'• '}{t}</span>
+                  ))}
                 </>)}
 
                 {event.type === 'wishlist_item_reserved' && (<>
-                  {event.label}<br />
-                  <span className="font-medium">{event.itemTitle}</span>
+                  {'Кто-то выбрал подарок: '}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    {event.itemTitle}
+                  </Link>
+                  <br />
+                  <span className="text-gray-400">из «{event.wishlistTitle}»</span>
                 </>)}
 
                 {event.type === 'wishlist_access_granted' && (<>
@@ -521,10 +552,11 @@ export default async function HomePage() {
               <ul className="grouped-card">
                 {displayedFriends.map((friend, i) => {
                   const count = friendWishlistCountMap.get(friend.id) ?? 0
+                  const itemCount = friendItemCountMap.get(friend.id) ?? 0
                   const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
                   const subline = count === 0
                     ? birthday
-                    : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${birthday ? ` • ${birthday}` : ''}`
+                    : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
                   return (
                     <li key={friend.id}>
                       {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
