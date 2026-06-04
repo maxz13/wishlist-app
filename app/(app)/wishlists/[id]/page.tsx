@@ -133,7 +133,7 @@ export default async function WishlistDetailPage({
   }
 
   return (
-    <main className="px-4 pb-10 pt-4">
+    <main className="px-5 pb-10 pt-4">
       <Link href={backHref} className="text-sm text-gray-600">
         ‹ Назад
       </Link>

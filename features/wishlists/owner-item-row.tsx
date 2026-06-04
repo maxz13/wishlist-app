@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   deleteWishlistItemAction,
@@ -43,6 +43,16 @@ export function OwnerItemRow({
   const [savePending, startSaveTransition] = useTransition()
   const anyPending = deletePending || visibilityPending || savePending
 
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState(item.title)
+
+  useEffect(() => {
+    if (!isExpanded) {
+      setEditingTitle(false)
+      setTitleValue(item.title)
+    }
+  }, [isExpanded, item.title])
+
   function handleDelete() {
     setDeleteError(null)
     startDeleteTransition(async () => {
@@ -75,25 +85,37 @@ export function OwnerItemRow({
   const showEditFields = isExpanded && !confirming
 
   return (
-    <div className={`flex items-start gap-3 py-2.5 ${isReserved ? '-mx-2 rounded-lg bg-green-50 px-2' : ''}`}>
+    <div className={`flex items-start gap-3 ${showEditFields ? 'rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3' : `py-2.5${isReserved ? ' -mx-2 rounded-lg bg-green-50 px-2' : ''}`}`}>
       <div className="min-w-0 flex-1">
-        <p
-          className={`text-[15px] font-medium leading-snug transition-colors ${
-            isDraft || confirming ? 'text-gray-400' : 'text-gray-900'
-          }`}
-        >
-          {confirming ? (
-            item.title
-          ) : (
-            <button
-              type="button"
-              onClick={isExpanded ? onCollapse : onExpand}
-              className="block w-full text-left"
-            >
-              {item.title}
-            </button>
-          )}
-        </p>
+        {showEditFields && editingTitle ? (
+          <input
+            type="text"
+            value={titleValue}
+            onChange={e => setTitleValue(e.target.value)}
+            autoFocus
+            className={`w-full bg-transparent text-[15px] font-medium leading-snug focus:outline-none ${
+              isDraft ? 'text-gray-400' : 'text-gray-900'
+            }`}
+          />
+        ) : (
+          <p
+            className={`text-[15px] font-medium leading-snug transition-colors ${
+              isDraft || confirming ? 'text-gray-400' : 'text-gray-900'
+            }`}
+          >
+            {confirming ? (
+              item.title
+            ) : (
+              <button
+                type="button"
+                onClick={showEditFields ? () => setEditingTitle(true) : onExpand}
+                className="block w-full text-left"
+              >
+                {item.title}
+              </button>
+            )}
+          </p>
+        )}
 
         {!confirming && item.price !== null && !showEditFields && (
           <p className={`mt-0.5 text-sm ${isDraft ? 'text-gray-400' : 'text-gray-700'}`}>
@@ -109,31 +131,24 @@ export function OwnerItemRow({
           <form
             key={showEditFields ? 'open' : 'closed'}
             onSubmit={handleSave}
-            className="pb-1 pt-2"
+            className="pb-1 pt-3"
           >
-            <div className="flex flex-col gap-2">
-              <input
-                name="title"
-                type="text"
-                placeholder="Название"
-                defaultValue={item.title}
-                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
-              />
+            <input type="hidden" name="title" value={titleValue} />
+            <div className="flex flex-col gap-3 pl-3">
               <input
                 name="price"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 placeholder="299 €"
                 defaultValue={item.price ?? ''}
-                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+                className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
               />
               <input
                 name="link"
                 type="url"
                 placeholder="Ссылка на товар"
                 defaultValue={item.link ?? ''}
-                className="border-b border-gray-200 bg-transparent pb-1 text-sm text-gray-700 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+                className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
               />
             </div>
             {(saveState?.errors?.title || saveState?.errors?.price || saveState?.errors?.link || (saveState?.message && !saveState.success)) && (
@@ -147,7 +162,7 @@ export function OwnerItemRow({
             <button
               type="submit"
               disabled={savePending}
-              className="mt-2.5 text-sm font-medium text-[#3b82f6] disabled:opacity-40"
+              className="mt-2.5 pl-3 text-sm font-medium text-[#3b82f6] disabled:opacity-40"
             >
               {savePending ? 'Сохранение…' : 'Сохранить'}
             </button>
@@ -217,13 +232,6 @@ export function OwnerItemRow({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-full z-20 mt-1 min-w-[7rem] overflow-hidden rounded-xl bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => { setMenuOpen(false); onExpand() }}
-                  className="w-full px-4 py-2.5 text-left text-sm text-gray-800"
-                >
-                  Переименовать
-                </button>
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); setConfirming(true) }}
