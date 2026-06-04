@@ -134,19 +134,22 @@ export default async function HomePage() {
       .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
       .eq('is_visible', true)
       .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(100),
     supabase
       .from('reservations')
       .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id))')
       .neq('reserved_by_user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(50),
     supabase
       .from('wishlist_access')
       .select('created_at, wishlists!inner(id, title, owner_id, profiles!inner(id, name, surname))')
       .eq('user_id', user!.id)
       .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   // Derive IDs from Round 1 results
@@ -210,6 +213,7 @@ export default async function HomePage() {
         .eq('is_archived', false)
         .gte('created_at', sevenDaysAgo)
         .order('created_at', { ascending: false })
+        .limit(50)
     })(),
     // "Я подарю" reserved items (depends on myReservations)
     (async () => {
