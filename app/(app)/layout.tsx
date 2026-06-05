@@ -55,7 +55,7 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="fixed inset-0 flex flex-col">
       <header className="shrink-0 flex items-center bg-white dark:bg-[#1c1c1e] px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {profile.avatar_url ? (
