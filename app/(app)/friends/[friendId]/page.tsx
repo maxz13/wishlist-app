@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { RemoveFriendSection } from '@/features/friends/remove-friend-section'
 
 type Wishlist = {
   id: string
@@ -63,6 +64,8 @@ export default async function FriendProfilePage({
           </ul>
         )}
       </div>
+
+      <RemoveFriendSection friendId={friendId} />
     </main>
   )
 }

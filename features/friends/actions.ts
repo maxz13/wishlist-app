@@ -1,6 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
@@ -69,4 +70,17 @@ export async function declineFriendRequestAction(requestId: string): Promise<{ e
   revalidatePath('/friends')
   revalidatePath('/home')
   return {}
+}
+
+export async function removeFriendAction(friendId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+  const { error } = await supabase.rpc('remove_friend', { p_friend_id: friendId })
+  if (error) return { error: 'Не удалось удалить. Попробуйте ещё раз.' }
+  revalidatePath('/friends')
+  revalidatePath('/home')
+  redirect('/friends')
 }

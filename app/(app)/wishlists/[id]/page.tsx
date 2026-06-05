@@ -9,7 +9,7 @@ import {
   ReservationControls,
   type ReservationState,
 } from '@/features/wishlists/reservation-controls'
-import { archiveWishlistAction, restoreWishlistAction } from '@/features/wishlists/actions'
+import { archiveWishlistAction, restoreWishlistAction, leaveWishlistAction } from '@/features/wishlists/actions'
 import { MarkWishlistSeenEffect } from '@/features/wishlists/mark-seen-effect'
 import {
   WishlistAccessSection,
@@ -224,6 +224,17 @@ export default async function WishlistDetailPage({
             selectedFriendIds={accessUserIds}
             friends={ownerFriends}
           />
+        )}
+
+        {!isOwner && wishlist.visibility === 'selected_friends' && (
+          <div className="mt-6 border-t border-gray-100 pt-4">
+            <form action={leaveWishlistAction}>
+              <input type="hidden" name="wishlist_id" value={id} />
+              <button type="submit" className="text-sm text-gray-400">
+                Покинуть вишлист
+              </button>
+            </form>
+          </div>
         )}
 
         {isOwner && (

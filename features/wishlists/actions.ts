@@ -402,3 +402,17 @@ export async function markWishlistSeenAction(wishlistId: string): Promise<void> 
   await supabase.rpc('mark_wishlist_access_seen', { p_wishlist_id: wishlistId })
   revalidatePath('/wishlists')
 }
+
+export async function leaveWishlistAction(formData: FormData): Promise<void> {
+  const wishlistId = formData.get('wishlist_id') as string | null
+  if (!wishlistId) return
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+  const { error } = await supabase.rpc('leave_wishlist_access', { p_wishlist_id: wishlistId })
+  if (error) return
+  revalidatePath('/wishlists')
+  redirect('/wishlists')
+}
