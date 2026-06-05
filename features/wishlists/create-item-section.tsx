@@ -133,15 +133,17 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
       {errors.message && (
         <p className="mt-1 pl-3 text-xs text-red-600">{errors.message}</p>
       )}
-      <button
-        type="button"
-        onMouseDown={e => e.preventDefault()}
-        onClick={submit}
-        disabled={pending || !title.trim()}
-        className="mt-2.5 pl-3 text-sm font-medium text-[#3b82f6] disabled:opacity-40"
-      >
-        {pending ? '…' : 'Добавить'}
-      </button>
+      <div className="mt-2.5 flex justify-end">
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={submit}
+          disabled={pending || !title.trim()}
+          className="text-sm font-medium text-[#3b82f6] disabled:opacity-40"
+        >
+          {pending ? '…' : 'Добавить'}
+        </button>
+      </div>
     </div>
   )
 }

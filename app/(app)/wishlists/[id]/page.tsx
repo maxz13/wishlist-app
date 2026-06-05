@@ -8,8 +8,9 @@ import {
   ReservationControls,
   type ReservationState,
 } from '@/features/wishlists/reservation-controls'
-import { archiveWishlistAction, restoreWishlistAction, leaveWishlistAction } from '@/features/wishlists/actions'
+import { leaveWishlistAction } from '@/features/wishlists/actions'
 import { MarkWishlistSeenEffect } from '@/features/wishlists/mark-seen-effect'
+import { WishlistTitle } from '@/features/wishlists/wishlist-title'
 import {
   WishlistAccessSection,
   type WishlistVisibility,
@@ -141,7 +142,7 @@ export default async function WishlistDetailPage({
         ‹ Назад
       </Link>
 
-      <h1 className="mt-3 text-xl font-bold leading-tight">{wishlist.title}</h1>
+      <WishlistTitle wishlistId={id} title={wishlist.title} isOwner={isOwner} />
 
       <div className="mt-5">
         {isOwner && (
@@ -237,25 +238,6 @@ export default async function WishlistDetailPage({
           </div>
         )}
 
-        {isOwner && (
-          <div className="mt-6">
-            {wishlist.is_archived ? (
-              <form action={restoreWishlistAction}>
-                <input type="hidden" name="wishlist_id" value={id} />
-                <button type="submit" className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Восстановить из архива
-                </button>
-              </form>
-            ) : (
-              <form action={archiveWishlistAction}>
-                <input type="hidden" name="wishlist_id" value={id} />
-                <button type="submit" className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Архивировать
-                </button>
-              </form>
-            )}
-          </div>
-        )}
       </div>
     </main>
   )

@@ -66,7 +66,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
   const iconBox = 'flex h-7 w-7 items-center justify-center'
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-[#fafafa] dark:bg-[#111111]">
+    <nav className="relative z-10 shrink-0 bg-[#fafafa] dark:bg-[#111111]">
       <div className="flex h-[74px] items-center">
 
         {/* 1. Лента */}
