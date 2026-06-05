@@ -64,7 +64,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
-Session 2026-06-06. All changes deployed to production on `main`.
+Session 2026-06-06. All changes deployed to production on `main` (commit `68f4560`).
 
 Friend search overhaul (2026-06-06):
 - Two-mode search: default = 2nd + 3rd-degree social graph only (`search_social_graph` RPC, CTE-based friendship walk, SECURITY DEFINER STABLE, LIMIT 15); "Искать дальше" triggers full profiles scan (`search_global` RPC, SECURITY DEFINER STABLE, LIMIT 20, excludes already-shown IDs via `p_exclude_ids uuid[]`)
