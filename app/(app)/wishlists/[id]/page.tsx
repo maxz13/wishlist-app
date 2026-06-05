@@ -10,6 +10,7 @@ import {
   type ReservationState,
 } from '@/features/wishlists/reservation-controls'
 import { archiveWishlistAction, restoreWishlistAction } from '@/features/wishlists/actions'
+import { MarkWishlistSeenEffect } from '@/features/wishlists/mark-seen-effect'
 import {
   WishlistAccessSection,
   type WishlistVisibility,
@@ -134,6 +135,9 @@ export default async function WishlistDetailPage({
 
   return (
     <main className="px-5 pb-10 pt-4">
+      {!isOwner && wishlist.visibility === 'selected_friends' && (
+        <MarkWishlistSeenEffect wishlistId={id} />
+      )}
       <Link href={backHref} className="text-sm text-gray-600">
         ‹ Назад
       </Link>

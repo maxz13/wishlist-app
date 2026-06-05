@@ -20,7 +20,7 @@ export default async function WishlistsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [activeResult, archivedResult, sharedResult] = await Promise.all([
+  const [activeResult, archivedResult, sharedResult, unseenAccessResult] = await Promise.all([
     supabase
       .from('wishlists')
       .select('id, title, created_at, visibility')
@@ -36,16 +36,25 @@ export default async function WishlistsPage() {
     // Wishlists shared with current user via selected_friends access
     supabase
       .from('wishlists')
-      .select('id, title')
+      .select('id, title, owner_id')
       .eq('visibility', 'selected_friends')
       .eq('is_archived', false)
       .neq('owner_id', user!.id)
       .order('created_at', { ascending: false }),
+    // Unseen wishlist_access rows — drives the green dot indicator
+    supabase
+      .from('wishlist_access')
+      .select('wishlist_id')
+      .eq('user_id', user!.id)
+      .is('seen_at', null),
   ])
 
   const wishlists       = (activeResult.data ?? []) as Wishlist[]
   const archived        = (archivedResult.data ?? []) as Wishlist[]
-  const sharedWishlists = (sharedResult.data ?? []) as { id: string; title: string }[]
+  const sharedWishlists = (sharedResult.data ?? []) as { id: string; title: string; owner_id: string }[]
+  const newAccessIds    = new Set(
+    ((unseenAccessResult.data ?? []) as Array<{ wishlist_id: string }>).map(r => r.wishlist_id)
+  )
 
   const itemCountMap   = new Map<string, number>()
   const accessCountMap = new Map<string, number>()
@@ -64,20 +73,31 @@ export default async function WishlistsPage() {
   }
 
   const sharedItemCountMap = new Map<string, number>()
+  const ownerById = new Map<string, { name: string; surname: string }>()
   if (sharedWishlists.length > 0) {
-    const { data: counts } = await supabase
-      .from('wishlist_items')
-      .select('wishlist_id')
-      .in('wishlist_id', sharedWishlists.map(w => w.id))
-      .eq('is_visible', true)
-    for (const row of (counts ?? [])) {
+    const ownerIds = [...new Set(sharedWishlists.map(w => w.owner_id))]
+    const [itemCountResult, ownerProfilesResult] = await Promise.all([
+      supabase
+        .from('wishlist_items')
+        .select('wishlist_id')
+        .in('wishlist_id', sharedWishlists.map(w => w.id))
+        .eq('is_visible', true),
+      supabase
+        .from('profiles')
+        .select('id, name, surname')
+        .in('id', ownerIds),
+    ])
+    for (const row of (itemCountResult.data ?? [])) {
       sharedItemCountMap.set(row.wishlist_id, (sharedItemCountMap.get(row.wishlist_id) ?? 0) + 1)
+    }
+    for (const p of (ownerProfilesResult.data ?? []) as Array<{ id: string; name: string; surname: string }>) {
+      ownerById.set(p.id, { name: p.name, surname: p.surname })
     }
   }
 
   return (
     <main className="p-4">
-      <h1 className="section-title">Вишлисты</h1>
+      <h1 className="section-title">Мои вишлисты</h1>
 
       {wishlists.length === 0 ? (
         <div className="mt-10 flex flex-col items-center gap-2 text-center">
@@ -110,7 +130,7 @@ export default async function WishlistsPage() {
 
       {sharedWishlists.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-2 section-title">Доступные вам</h2>
+          <h2 className="mb-2 section-title">Вишлисты по приглашению</h2>
           <ul className="grouped-card">
             {sharedWishlists.map((w, i) => {
               const count = sharedItemCountMap.get(w.id) ?? 0
@@ -122,7 +142,17 @@ export default async function WishlistsPage() {
                     className="flex items-center justify-between px-4 py-3"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                      <div className="flex items-center gap-1.5">
+                        {newAccessIds.has(w.id) && (
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                        )}
+                        <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                      </div>
+                      {ownerById.get(w.owner_id) && (
+                        <p className="mt-0.5 text-xs text-gray-500">
+                          от {ownerById.get(w.owner_id)!.name} {ownerById.get(w.owner_id)!.surname}
+                        </p>
+                      )}
                       <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
                         <Lock size={11} className="shrink-0" />
                         По приглашению

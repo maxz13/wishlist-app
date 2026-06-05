@@ -18,7 +18,7 @@ export default async function AppLayout({
     redirect('/login')
   }
 
-  const [{ data: profile }, { count: pendingCount }] = await Promise.all([
+  const [{ data: profile }, { count: pendingCount }, { count: unseenWishlistCount }] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, name, surname, avatar_url, username')
@@ -28,6 +28,11 @@ export default async function AppLayout({
       .from('friend_requests')
       .select('*', { count: 'exact', head: true })
       .eq('to_user_id', user.id),
+    supabase
+      .from('wishlist_access')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('seen_at', null),
   ])
 
   const initials = profile
@@ -84,7 +89,7 @@ export default async function AppLayout({
 
       <div className="flex-1 pb-16">{children}</div>
 
-      <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} />
+      <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} hasUnreadInvitedWishlists={(unseenWishlistCount ?? 0) > 0} />
     </div>
   )
 }

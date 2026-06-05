@@ -392,3 +392,13 @@ export async function deleteWishlistAction(
   revalidatePath('/home')
   return {}
 }
+
+export async function markWishlistSeenAction(wishlistId: string): Promise<void> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase.rpc('mark_wishlist_access_seen', { p_wishlist_id: wishlistId })
+  revalidatePath('/wishlists')
+}

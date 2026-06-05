@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-type Props = { initials: string; avatarUrl: string | null; hasPendingRequests: boolean }
+type Props = { initials: string; avatarUrl: string | null; hasPendingRequests: boolean; hasUnreadInvitedWishlists: boolean }
 
 function HomeIcon() {
   return (
@@ -47,7 +47,7 @@ function PlusIcon() {
   )
 }
 
-export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
+export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadInvitedWishlists }: Props) {
   const pathname = usePathname()
 
   function isActive(href: string) {
@@ -104,8 +104,11 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests }: Props) {
 
         {/* 4. Вишлисты */}
         <Link href="/wishlists" className={tabCls('/wishlists')}>
-          <span className={iconBox}>
+          <span className={`${iconBox} relative`}>
             <ListIcon />
+            {hasUnreadInvitedWishlists && (
+              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white" />
+            )}
           </span>
           <span>Вишлисты</span>
         </Link>
