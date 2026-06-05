@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Gift } from 'lucide-react'
+import { Gift, EyeOff } from 'lucide-react'
 import {
   deleteWishlistItemAction,
   toggleWishlistItemVisibilityAction,
@@ -79,8 +79,13 @@ export function OwnerItemRow({
   function doSave(e?: React.FormEvent<HTMLFormElement>) {
     e?.preventDefault()
     if (savePending || !formRef.current) return
-    setSaveState(undefined)
     const formData = new FormData(formRef.current)
+    const isDirty =
+      titleValue !== item.title ||
+      (formData.get('price') as string) !== (item.price !== null ? String(item.price) : '') ||
+      (formData.get('link') as string) !== (item.link ?? '')
+    if (!isDirty) { onCollapse(); return }
+    setSaveState(undefined)
     startSaveTransition(async () => {
       const result = await updateWishlistItemAction(item.id, wishlistId, formData)
       if (result?.success) onCollapse()
@@ -95,7 +100,10 @@ export function OwnerItemRow({
   const showEditFields = isExpanded && !confirming
 
   return (
-    <div className={`flex items-start gap-3 ${showEditFields ? 'rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 shadow-sm' : `py-2.5${isReserved ? ' -mx-2 rounded-lg bg-green-50 px-2' : ''}`}`}>
+    <div className={`flex gap-3 ${showEditFields ? 'items-start py-3' : `items-center py-2.5${isReserved ? ' -mx-2 rounded-lg bg-green-50 dark:bg-green-950 px-2' : ''}`}`}>
+      {isDraft && !showEditFields && (
+        <EyeOff size={16} className="shrink-0 text-gray-400 dark:text-gray-500" />
+      )}
       <div className="min-w-0 flex-1">
         {showEditFields && editingTitle ? (
           <input
@@ -104,13 +112,13 @@ export function OwnerItemRow({
             onChange={e => setTitleValue(e.target.value)}
             autoFocus
             className={`w-full bg-transparent text-[15px] font-medium leading-snug border-b border-transparent pb-0.5 focus:border-gray-300 focus:outline-none ${
-              isDraft ? 'text-gray-400' : 'text-gray-900'
+              isDraft ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'
             }`}
           />
         ) : (
           <p
             className={`text-[15px] font-medium leading-snug transition-colors ${
-              isDraft || confirming ? 'text-gray-400' : 'text-gray-900'
+              isDraft || confirming ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'
             }`}
           >
             {confirming ? (
@@ -132,7 +140,7 @@ export function OwnerItemRow({
         )}
 
         {!confirming && item.price !== null && !showEditFields && (
-          <p className={`mt-0.5 text-sm ${isDraft ? 'text-gray-400' : 'text-gray-700'}`}>
+          <p className={`mt-0.5 text-sm ${isDraft ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
             {item.price.toLocaleString('ru-RU')} €
           </p>
         )}
@@ -158,7 +166,7 @@ export function OwnerItemRow({
                   inputMode="decimal"
                   placeholder="299 €"
                   defaultValue={item.price ?? ''}
-                  className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                  className="bg-transparent text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none"
                 />
                 {saveState?.errors?.price && (
                   <p className="mt-0.5 text-xs text-red-600">{saveState.errors.price[0]}</p>
@@ -170,7 +178,7 @@ export function OwnerItemRow({
                   type="url"
                   placeholder="Ссылка на товар"
                   defaultValue={item.link ?? ''}
-                  className="bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                  className="bg-transparent text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none"
                 />
                 {saveState?.errors?.link && (
                   <p className="mt-0.5 text-xs text-red-600">{saveState.errors.link[0]}</p>
@@ -196,7 +204,7 @@ export function OwnerItemRow({
 
         {confirming && (
           <div className="mt-1.5">
-            <p className="text-sm text-gray-600">Удалить подарок?</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Удалить подарок?</p>
             <div className="mt-1.5 flex items-center gap-4">
               <button
                 type="button"
@@ -248,7 +256,7 @@ export function OwnerItemRow({
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 min-w-[7rem] overflow-hidden rounded-xl bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 min-w-[7rem] overflow-hidden rounded-xl bg-white dark:bg-[#2c2c2e] py-1 shadow-lg dark:shadow-none dark:ring-1 dark:ring-[#323234]">
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); setConfirming(true) }}

@@ -33,9 +33,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full bg-[#fafafa] antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full bg-background antialiased`}
     >
-      <body className="min-h-full bg-[#fafafa] flex flex-col">{children}</body>
+      <body className="min-h-full bg-background flex flex-col">{children}</body>
     </html>
   );
 }

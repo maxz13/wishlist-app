@@ -70,7 +70,7 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="@никнейм"
-          className="w-full bg-transparent px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
+          className="w-full bg-transparent px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
         />
       </div>
 
@@ -88,20 +88,20 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
             const incomingReqId = incomingMap[r.id]
             return (
               <li key={r.id}>
-                {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
+                {i > 0 && <div className="row-divider" />}
                 <div className="flex items-center gap-3 px-4 py-3">
                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
                     {r.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={r.avatar_url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
+                      <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
                         {(r.name[0] + (r.surname?.[0] ?? '')).toUpperCase()}
                       </span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">@{r.username}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">@{r.username}</p>
                     <p className="text-xs text-gray-400">{r.name} {r.surname}</p>
                   </div>
                   <div className="shrink-0">
@@ -111,7 +111,7 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
                       <button
                         type="button"
                         onClick={() => handleAccept(r.id, incomingReqId)}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+                        className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
                       >
                         Принять
                       </button>
@@ -121,7 +121,7 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
                       <button
                         type="button"
                         onClick={() => handleSend(r.id)}
-                        className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+                        className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
                       >
                         Отправить
                       </button>

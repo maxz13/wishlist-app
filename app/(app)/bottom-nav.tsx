@@ -66,7 +66,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
   const iconBox = 'flex h-7 w-7 items-center justify-center'
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-[#fafafa]">
+    <nav className="fixed bottom-0 left-0 right-0 z-10 bg-[#fafafa] dark:bg-[#111111]">
       <div className="flex h-[74px] items-center">
 
         {/* 1. Лента */}
@@ -82,7 +82,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
           <span className={`${iconBox} relative`}>
             <UsersIcon />
             {hasPendingRequests && (
-              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white" />
+              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-[#fafafa] dark:ring-[#111111]" />
             )}
           </span>
           <span>Друзья</span>
@@ -107,7 +107,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
           <span className={`${iconBox} relative`}>
             <ListIcon />
             {hasUnreadInvitedWishlists && (
-              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-white" />
+              <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-green-500 ring-1 ring-[#fafafa] dark:ring-[#111111]" />
             )}
           </span>
           <span>Вишлисты</span>
@@ -131,7 +131,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
             <span
               className={
                 iconBox + ' rounded-full text-[10px] font-bold ' +
-                (isActive('/profile') ? 'bg-[#3b82f6] text-white' : 'bg-gray-200 text-gray-500')
+                (isActive('/profile') ? 'bg-[#3b82f6] text-white' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300')
               }
             >
               {initials}

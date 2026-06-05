@@ -100,11 +100,11 @@ export function WishlistCard({ id, title, itemCount, isArchived, visibility, sel
             onKeyDown={handleRenameKeyDown}
             onBlur={cancelRename}
             disabled={renamePending}
-            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-gray-900 focus:outline-none disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium text-gray-900 dark:text-gray-100 focus:outline-none disabled:opacity-50"
           />
         ) : (
           <Link href={`/wishlists/${id}`} className="min-w-0 flex-1">
-            <p className={`text-sm font-medium ${isArchived ? 'text-gray-400' : 'text-gray-900'}`}>
+            <p className={`text-sm font-medium ${isArchived ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
               {title}
             </p>
             {itemCount > 0 && (
@@ -141,18 +141,18 @@ export function WishlistCard({ id, title, itemCount, isArchived, visibility, sel
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-full z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl bg-white py-1 shadow-lg">
+                <div className="absolute right-0 top-full z-20 mt-1 min-w-[10rem] overflow-hidden rounded-xl bg-white dark:bg-[#2c2c2e] py-1 shadow-lg dark:shadow-none dark:ring-1 dark:ring-[#323234]">
                   <button
                     type="button"
                     onClick={openRename}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700"
+                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300"
                   >
                     Переименовать
                   </button>
                   <button
                     type="button"
                     onClick={handleArchiveToggle}
-                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700"
+                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-gray-300"
                   >
                     {isArchived ? 'Восстановить' : 'Архивировать'}
                   </button>
@@ -176,7 +176,7 @@ export function WishlistCard({ id, title, itemCount, isArchived, visibility, sel
 
       {confirming && (
         <div className="mt-2">
-          <p className="text-sm font-medium text-gray-700">Удалить вишлист?</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Удалить вишлист?</p>
           <p className="mt-0.5 text-xs text-gray-500">
             Все желания и резервирования будут удалены.
           </p>

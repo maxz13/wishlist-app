@@ -44,7 +44,7 @@ export function CreateWishlistSection() {
         className="grouped-card mt-3 flex w-full items-center justify-between px-4 py-4 text-left"
       >
         <div>
-          <p className="text-sm font-medium text-gray-900">Создать вишлист</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Создать вишлист</p>
           <p className="mt-0.5 text-xs text-gray-400">Новый список желаний</p>
         </div>
         <span className="text-2xl font-light text-gray-300" aria-hidden="true">+</span>
@@ -67,7 +67,7 @@ export function CreateWishlistSection() {
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           disabled={pending}
-          className="w-full bg-transparent text-sm font-medium text-gray-900 placeholder-gray-400 focus:outline-none disabled:opacity-50"
+          className="w-full bg-transparent text-sm font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none disabled:opacity-50"
         />
         {state?.errors?.title && (
           <p className="mt-1 text-xs text-red-600">{state.errors.title[0]}</p>

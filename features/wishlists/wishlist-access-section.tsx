@@ -45,7 +45,7 @@ function Avatar({ friend, size }: { friend: Friend; size: 'sm' | 'xs' }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span className={`flex h-full w-full items-center justify-center bg-gray-200 ${textSize} font-semibold text-gray-600`}>
+        <span className={`flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 ${textSize} font-semibold text-gray-600 dark:text-gray-300`}>
           {initials}
         </span>
       )}
@@ -118,7 +118,7 @@ export function WishlistAccessSection({
       .filter((f): f is Friend => !!f)
 
     return (
-      <div className="mt-6 border-t border-gray-100 pt-4">
+      <div className="mt-6 grouped-card px-4 py-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">Доступ: {label}</p>
           <button
@@ -144,7 +144,7 @@ export function WishlistAccessSection({
   }
 
   return (
-    <div className="mt-6 border-t border-gray-100 pt-4">
+    <div className="mt-6 grouped-card px-4 py-4">
       <div className="flex flex-col gap-3">
         {VISIBILITY_OPTIONS.map((opt) => (
           <button
@@ -164,7 +164,7 @@ export function WishlistAccessSection({
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
               )}
             </span>
-            <span className="text-sm text-gray-900">{opt.label}</span>
+            <span className="text-sm text-gray-900 dark:text-gray-100">{opt.label}</span>
           </button>
         ))}
       </div>
@@ -201,7 +201,7 @@ export function WishlistAccessSection({
                   )}
                 </span>
                 <Avatar friend={friend} size="sm" />
-                <span className="text-sm text-gray-900">
+                <span className="text-sm text-gray-900 dark:text-gray-100">
                   {friend.name} {friend.surname}
                 </span>
               </button>

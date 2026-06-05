@@ -120,6 +120,26 @@ the skeleton appears. This is a framework-level constraint without `cacheCompone
 All `performance.now()`, `console.log('[PERF]...')`, and timing variables were removed.
 A pre-commit audit found no lost awaits, no `Promise.all` ordering bugs, no behavior changes.
 
+### 4. Wishlist item auto-save dirty check
+
+`doSave()` in `OwnerItemRow` (`features/wishlists/owner-item-row.tsx`) now compares
+current field values against their originals before calling `updateWishlistItemAction`:
+
+```tsx
+const isDirty =
+  titleValue !== item.title ||
+  (formData.get('price') as string) !== (item.price !== null ? String(item.price) : '') ||
+  (formData.get('link') as string) !== (item.link ?? '')
+if (!isDirty) { onCollapse(); return }
+```
+
+If no field was modified, `onCollapse()` is called directly. No Server Action is invoked,
+no DB write occurs, and no `revalidatePath` fires. This applies on both outside-click
+(via `requestClose`) and manually opening another item.
+
+Effect: eliminates unnecessary write operations and cache invalidation on every close of an
+unedited wish — including the common case of accidentally tapping a wish row and closing it.
+
 ---
 
 ## Measured Results
@@ -198,3 +218,4 @@ before changing.
 - [x] No UI design changes
 - [x] Code audit: no lost awaits, no `Promise.all` ordering bug, no hidden behavior change
 - [x] Live measurement confirmed −67% warm improvement
+- [x] Auto-save dirty check: build passes, no TypeScript errors, no behavior changes for edited items

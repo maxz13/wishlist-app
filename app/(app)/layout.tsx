@@ -42,7 +42,7 @@ export default async function AppLayout({
   if (!profile) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center">
-        <p className="text-base font-medium text-gray-800">Профиль не найден</p>
+        <p className="text-base font-medium text-gray-800 dark:text-gray-200">Профиль не найден</p>
         <p className="mt-2 max-w-xs text-sm text-gray-500">
           Аккаунт существует, но профиль не был создан. Попробуйте выйти и войти снова.
         </p>
@@ -57,7 +57,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between bg-white dark:bg-[#1c1c1e] px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3 mr-4">
           {profile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -67,12 +67,12 @@ export default async function AppLayout({
               className="h-16 w-16 shrink-0 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600 dark:bg-gray-700 dark:text-gray-300">
               {initials}
             </span>
           )}
           <div className="min-w-0">
-            <p className="text-xl font-bold leading-tight text-gray-900">
+            <p className="text-xl font-bold leading-tight text-gray-900 dark:text-gray-50">
               {profile.name} {profile.surname}
             </p>
             <p className="text-sm leading-tight text-gray-400">
@@ -81,7 +81,7 @@ export default async function AppLayout({
           </div>
         </div>
         <form action={logoutAction}>
-          <button type="submit" aria-label="Выйти" className="shrink-0 text-gray-500">
+          <button type="submit" aria-label="Выйти" className="shrink-0 text-gray-500 dark:text-gray-400">
             <LogOut size={18} />
           </button>
         </form>

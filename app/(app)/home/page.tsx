@@ -426,20 +426,20 @@ export default async function HomePage() {
       <main className="px-4 pb-10 pt-4">
         <h1 className="text-xl font-semibold">Лента</h1>
         <div className="mt-12 flex flex-col items-center gap-3 text-center">
-          <p className="text-base font-medium text-gray-800">Пока здесь пусто</p>
+          <p className="text-base font-medium text-gray-800 dark:text-gray-200">Пока здесь пусто</p>
           <p className="max-w-xs text-sm text-gray-500">
             Создайте вишлист или пригласите друзей — здесь появятся их желания.
           </p>
           <div className="mt-2 flex w-full max-w-xs flex-col gap-3">
             <Link
               href="/wishlists"
-              className="rounded-xl bg-gray-900 py-3 text-center text-sm font-medium text-white"
+              className="rounded-xl bg-gray-900 dark:bg-white py-3 text-center text-sm font-medium text-white dark:text-gray-900"
             >
               Создать вишлист
             </Link>
             <Link
               href="/friends"
-              className="rounded-xl border border-gray-300 py-3 text-center text-sm font-medium text-gray-700"
+              className="rounded-xl border border-gray-300 dark:border-[#323234] py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Пригласить друга
             </Link>
@@ -467,7 +467,7 @@ export default async function HomePage() {
               )}
               <div className="flex items-start gap-3 px-4 py-3">
               <span className="mt-1 feed-bullet" />
-              <p className="text-sm leading-snug text-gray-900">
+              <p className="text-sm leading-snug text-gray-900 dark:text-gray-100">
 
                 {event.type === 'new_friend' && (<>
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
@@ -561,7 +561,7 @@ export default async function HomePage() {
                     : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
                   return (
                     <li key={friend.id}>
-                      {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
+                      {i > 0 && <div className="row-divider" />}
                       <Link
                         href={`/friends/${friend.id}`}
                         className="flex items-center gap-3 px-4 py-3"
@@ -571,13 +571,13 @@ export default async function HomePage() {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
                           ) : (
-                            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
+                            <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
                               {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
                             </span>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900">{friend.name} {friend.surname}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
                           {subline && <p className="text-xs text-gray-400">{subline}</p>}
                         </div>
                         <span className="shrink-0 text-gray-400">›</span>
@@ -595,7 +595,7 @@ export default async function HomePage() {
           ) : (
             <div className="flex flex-col gap-1.5">
               <p className="text-sm text-gray-500">У вас пока нет друзей</p>
-              <Link href="/friends" className="text-sm text-gray-700 underline">
+              <Link href="/friends" className="text-sm text-gray-700 dark:text-gray-300 underline">
                 Пригласить друга
               </Link>
             </div>
@@ -616,13 +616,13 @@ export default async function HomePage() {
                 const count = itemCountMap.get(w.id) ?? 0
                 return (
                   <li key={w.id}>
-                    {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                    {i > 0 && <div className="row-divider" />}
                     <Link
                       href={`/wishlists/${w.id}`}
                       className="flex items-center justify-between px-4 py-3"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{w.title}</p>
                         <p className="text-xs text-gray-400">
                           {count} {pluralRu(count, 'желание', 'желания', 'желаний')}
                         </p>
@@ -648,7 +648,7 @@ export default async function HomePage() {
         {hasFriends && !hasWishlists && (
           <Link
             href="/wishlists"
-            className="mt-8 rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-medium text-gray-700 sm:mt-10"
+            className="mt-8 rounded-xl border border-gray-300 dark:border-[#323234] px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300 sm:mt-10"
           >
             Создать первый вишлист
           </Link>
@@ -661,13 +661,13 @@ export default async function HomePage() {
             <ul className="grouped-card">
               {reservationRows.map((row, i) => (
                 <li key={row.reservationId}>
-                  {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                  {i > 0 && <div className="row-divider" />}
                   <Link
                     href={`/wishlists/${row.wishlistId}?fromFriend=${row.ownerId}`}
                     className="flex min-w-0 items-center justify-between px-4 py-3"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-900">
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
                         {row.itemTitle}
                       </p>
                       <p className="text-xs text-gray-400">

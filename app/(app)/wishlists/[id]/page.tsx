@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { CreateItemSection } from '@/features/wishlists/create-item-section'
 import { CircleMarker } from '@/features/wishlists/circle-marker'
 import { OwnerItemList } from '@/features/wishlists/owner-item-list'
 import { ReserveButton } from '@/features/wishlists/reserve-button'
@@ -138,14 +137,14 @@ export default async function WishlistDetailPage({
       {!isOwner && wishlist.visibility === 'selected_friends' && (
         <MarkWishlistSeenEffect wishlistId={id} />
       )}
-      <Link href={backHref} className="text-sm text-gray-600">
+      <Link href={backHref} className="text-sm text-gray-600 dark:text-gray-400">
         ‹ Назад
       </Link>
 
       <h1 className="mt-3 text-xl font-bold leading-tight">{wishlist.title}</h1>
 
       <div className="mt-5">
-        {isOwner && items.length > 0 && (
+        {isOwner && (
           <OwnerItemList
             items={items}
             wishlistId={id}
@@ -154,8 +153,8 @@ export default async function WishlistDetailPage({
         )}
 
         {!isOwner && items.length > 0 && (
-          <div className="divide-y divide-gray-100">
-            {items.map((item) => {
+          <div className="grouped-card">
+            {items.map((item, i) => {
               const reserverId = reservationByItemId.get(item.id) ?? null
               const reservationState: ReservationState = !reserverId
                 ? 'unreserved'
@@ -164,20 +163,22 @@ export default async function WishlistDetailPage({
                   : 'other'
 
               return (
-                <div key={item.id} className="flex items-start gap-3 py-2.5">
+                <div key={item.id}>
+                  {i > 0 && <div className="item-divider" />}
+                  <div className="flex items-center gap-3 px-4 py-2.5">
                   <CircleMarker
                     state={reservationState}
                     itemId={item.id}
                     wishlistId={id}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-medium leading-snug text-gray-900">
+                    <p className="text-[15px] font-medium leading-snug text-gray-900 dark:text-gray-100">
                       {item.title}
                     </p>
                     {(item.price !== null || item.link) && (
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-3">
                         {item.price !== null && (
-                          <span className="text-xs text-gray-700">
+                          <span className="text-xs text-gray-700 dark:text-gray-300">
                             {item.price.toLocaleString('ru-RU')} €
                           </span>
                         )}
@@ -186,7 +187,7 @@ export default async function WishlistDetailPage({
                             href={item.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-gray-700 underline"
+                            className="text-xs text-gray-700 dark:text-gray-300 underline"
                           >
                             ссылка ↗
                           </a>
@@ -205,6 +206,7 @@ export default async function WishlistDetailPage({
                   {reservationState === 'unreserved' && (
                     <ReserveButton itemId={item.id} wishlistId={id} />
                   )}
+                  </div>
                 </div>
               )
             })}
@@ -212,10 +214,8 @@ export default async function WishlistDetailPage({
         )}
 
         {items.length === 0 && !isOwner && (
-          <p className="py-3 text-sm text-gray-600">Список пока пуст.</p>
+          <p className="py-3 text-sm text-gray-600 dark:text-gray-400">Список пока пуст.</p>
         )}
-
-        {isOwner && <CreateItemSection wishlistId={id} />}
 
         {isOwner && (
           <WishlistAccessSection
@@ -227,7 +227,7 @@ export default async function WishlistDetailPage({
         )}
 
         {!isOwner && wishlist.visibility === 'selected_friends' && (
-          <div className="mt-6 border-t border-gray-100 pt-4">
+          <div className="mt-6 border-t border-gray-100 dark:border-[#323234] pt-4">
             <form action={leaveWishlistAction}>
               <input type="hidden" name="wishlist_id" value={id} />
               <button type="submit" className="text-sm text-gray-400">
@@ -238,18 +238,18 @@ export default async function WishlistDetailPage({
         )}
 
         {isOwner && (
-          <div className="mt-6 border-t border-gray-100 pt-4">
+          <div className="mt-6">
             {wishlist.is_archived ? (
               <form action={restoreWishlistAction}>
                 <input type="hidden" name="wishlist_id" value={id} />
-                <button type="submit" className="text-sm text-gray-500">
+                <button type="submit" className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
                   Восстановить из архива
                 </button>
               </form>
             ) : (
               <form action={archiveWishlistAction}>
                 <input type="hidden" name="wishlist_id" value={id} />
-                <button type="submit" className="text-sm text-gray-400">
+                <button type="submit" className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-gray-600 dark:text-gray-400">
                   Архивировать
                 </button>
               </form>

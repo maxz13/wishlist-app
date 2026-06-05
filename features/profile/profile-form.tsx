@@ -225,7 +225,7 @@ export function ProfileForm({ profile }: Props) {
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="flex h-full w-full items-center justify-center bg-gray-200 text-4xl font-semibold text-gray-600">
+            <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-4xl font-semibold text-gray-600 dark:text-gray-300">
               {initials}
             </span>
           )}
@@ -271,8 +271,8 @@ export function ProfileForm({ profile }: Props) {
 
       {/* ── Username — read-only, immutable after registration ── */}
       <section>
-        <p className="text-sm font-medium text-gray-700">Никнейм</p>
-        <p className="mt-1 text-sm text-gray-900">@{profile.username}</p>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Никнейм</p>
+        <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">@{profile.username}</p>
         <p className="mt-1 text-xs text-gray-400">
           Никнейм используется для поиска друзей и не может быть изменён.
         </p>
@@ -292,14 +292,14 @@ export function ProfileForm({ profile }: Props) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
               />
               {formState?.errors?.name && (
                 <p className="mt-1 text-xs text-red-600">{formState.errors.name[0]}</p>
               )}
             </div>
 
-            <div className="h-px bg-[#f3f4f6]" />
+            <div className="row-divider" />
 
             <div className="px-4 py-3">
               <label className="text-xs font-medium text-gray-500">Фамилия</label>
@@ -309,14 +309,14 @@ export function ProfileForm({ profile }: Props) {
                 value={surname}
                 onChange={(e) => setSurname(e.target.value)}
                 required
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
               />
               {formState?.errors?.surname && (
                 <p className="mt-1 text-xs text-red-600">{formState.errors.surname[0]}</p>
               )}
             </div>
 
-            <div className="h-px bg-[#f3f4f6]" />
+            <div className="row-divider" />
 
             <div className="px-4 py-3">
               <label className="text-xs font-medium text-gray-500">День рождения</label>
@@ -327,15 +327,15 @@ export function ProfileForm({ profile }: Props) {
                 placeholder="ДД.ММ.ГГГГ"
                 value={birthday}
                 onChange={(e) => setBirthday(e.target.value)}
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 focus:outline-none"
+                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
               />
             </div>
 
-            <div className="h-px bg-[#f3f4f6]" />
+            <div className="row-divider" />
 
             <div className="px-4 py-3">
               <label className="text-xs font-medium text-gray-500">Email</label>
-              <p className="mt-0.5 text-sm text-gray-900">{profile.email}</p>
+              <p className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">{profile.email}</p>
               <p className="mt-0.5 text-xs text-gray-400">Изменение email появится в следующей версии.</p>
             </div>
 
@@ -351,7 +351,7 @@ export function ProfileForm({ profile }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="w-full rounded-xl bg-gray-900 py-3 text-sm font-medium text-white disabled:opacity-40"
+            className="w-full rounded-xl bg-gray-900 dark:bg-white py-3 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-40"
           >
             {pending ? 'Сохранение...' : 'Сохранить'}
           </button>
@@ -361,13 +361,13 @@ export function ProfileForm({ profile }: Props) {
 
       {/* ── Security ── */}
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Безопасность</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Безопасность</h2>
 
         {!passwordOpen ? (
           <button
             type="button"
             onClick={() => setPasswordOpen(true)}
-            className="flex items-center gap-0.5 text-sm text-gray-900"
+            className="flex items-center gap-0.5 text-sm text-gray-900 dark:text-gray-100"
           >
             <span>Сменить пароль</span>
             <span className="text-gray-400">→</span>
@@ -377,7 +377,7 @@ export function ProfileForm({ profile }: Props) {
 
             {/* Current password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Текущий пароль</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Текущий пароль</label>
               <div className="relative">
                 <input
                   type={showCurrent ? 'text' : 'password'}
@@ -385,7 +385,7 @@ export function ProfileForm({ profile }: Props) {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 dark:border-[#323234] bg-gray-50 dark:bg-[#2c2c2e] px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 focus:bg-white dark:focus:bg-[#2c2c2e] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -403,7 +403,7 @@ export function ProfileForm({ profile }: Props) {
 
             {/* New password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Новый пароль</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Новый пароль</label>
               <div className="relative">
                 <input
                   type={showNew ? 'text' : 'password'}
@@ -411,7 +411,7 @@ export function ProfileForm({ profile }: Props) {
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   autoComplete="new-password"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 dark:border-[#323234] bg-gray-50 dark:bg-[#2c2c2e] px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 focus:bg-white dark:focus:bg-[#2c2c2e] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -429,7 +429,7 @@ export function ProfileForm({ profile }: Props) {
 
             {/* Confirm new password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Подтвердите новый пароль</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Подтвердите новый пароль</label>
               <div className="relative">
                 <input
                   type={showConfirm ? 'text' : 'password'}
@@ -437,7 +437,7 @@ export function ProfileForm({ profile }: Props) {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   autoComplete="new-password"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-10 text-sm focus:border-gray-400 focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-gray-200 dark:border-[#323234] bg-gray-50 dark:bg-[#2c2c2e] px-4 py-2.5 pr-10 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 focus:bg-white dark:focus:bg-[#2c2c2e] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -464,14 +464,14 @@ export function ProfileForm({ profile }: Props) {
               <button
                 type="button"
                 onClick={handlePasswordCancel}
-                className="flex-1 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-700"
+                className="flex-1 rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
               >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={passwordPending}
-                className="flex-1 rounded-xl bg-gray-900 py-3 text-sm font-medium text-white disabled:opacity-40"
+                className="flex-1 rounded-xl bg-gray-900 dark:bg-white py-3 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-40"
               >
                 {passwordPending ? 'Сохранение...' : 'Изменить'}
               </button>

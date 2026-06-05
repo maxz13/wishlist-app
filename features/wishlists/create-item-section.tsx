@@ -64,11 +64,11 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
 
   if (!expanded) {
     return (
-      <div className="border-t border-gray-100">
+      <div>
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-3 py-3 text-left"
+          className="flex w-full items-center gap-3 py-4 text-left"
         >
           <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-gray-300 text-[11px] leading-none text-gray-400">
             +
@@ -81,7 +81,7 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
 
   return (
     <div
-      className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 shadow-sm"
+      className="py-3"
       onBlur={handleContainerBlur}
     >
       <div>
@@ -93,7 +93,7 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
           onKeyDown={handleTitleKeyDown}
           placeholder="Название"
           disabled={pending}
-          className="w-full bg-transparent text-[15px] font-medium leading-snug text-gray-900 placeholder-gray-400 focus:outline-none disabled:opacity-50"
+          className="w-full bg-transparent text-[15px] font-medium leading-snug text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none disabled:opacity-50"
         />
         {errors.title && (
           <p className="mt-0.5 text-xs text-red-600">{errors.title}</p>
@@ -109,7 +109,7 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
             onKeyDown={handleFieldKeyDown}
             placeholder="299 €"
             disabled={pending}
-            className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none disabled:opacity-50"
+            className="w-full bg-transparent text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none disabled:opacity-50"
           />
           {errors.price && (
             <p className="mt-0.5 text-xs text-red-600">{errors.price}</p>
@@ -123,7 +123,7 @@ export function CreateItemSection({ wishlistId }: { wishlistId: string }) {
             onKeyDown={handleFieldKeyDown}
             placeholder="Ссылка на товар"
             disabled={pending}
-            className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none disabled:opacity-50"
+            className="w-full bg-transparent text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none disabled:opacity-50"
           />
           {errors.link && (
             <p className="mt-0.5 text-xs text-red-600">{errors.link}</p>

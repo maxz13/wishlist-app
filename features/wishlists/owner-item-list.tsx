@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { OwnerItemRow } from './owner-item-row'
+import { CreateItemSection } from './create-item-section'
 
 type Item = {
   id: string
@@ -36,25 +37,32 @@ export function OwnerItemList({
   }, [expandedId, closingId])
 
   return (
-    <div ref={listRef} className="divide-y divide-gray-100">
-      {items.map((item) => (
-        <OwnerItemRow
-          key={item.id}
-          item={item}
-          wishlistId={wishlistId}
-          isReserved={reservedItemIds.includes(item.id)}
-          isExpanded={expandedId === item.id}
-          onExpand={() => {
-            if (expandedId !== null && expandedId !== item.id) {
-              if (closingId === null) setClosingId(expandedId)
-            } else if (closingId === null) {
-              setExpandedId(item.id)
-            }
-          }}
-          onCollapse={() => { setExpandedId(null); setClosingId(null) }}
-          requestClose={closingId === item.id}
-          onSaveFailed={() => setClosingId(null)}
-        />
+    <div ref={listRef} className="grouped-card">
+      <div className="px-4">
+        <CreateItemSection wishlistId={wishlistId} />
+      </div>
+      {items.map((item, i) => (
+        <div key={item.id}>
+          <div className="item-divider" />
+          <div className="px-4">
+          <OwnerItemRow
+            item={item}
+            wishlistId={wishlistId}
+            isReserved={reservedItemIds.includes(item.id)}
+            isExpanded={expandedId === item.id}
+            onExpand={() => {
+              if (expandedId !== null && expandedId !== item.id) {
+                if (closingId === null) setClosingId(expandedId)
+              } else if (closingId === null) {
+                setExpandedId(item.id)
+              }
+            }}
+            onCollapse={() => { setExpandedId(null); setClosingId(null) }}
+            requestClose={closingId === item.id}
+            onSaveFailed={() => setClosingId(null)}
+          />
+          </div>
+        </div>
       ))}
     </div>
   )

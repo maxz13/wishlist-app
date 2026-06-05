@@ -98,7 +98,7 @@ export function CreateInviteSection() {
   }
 
   return (
-    <section className="mt-8 border-t border-gray-200 pt-6">
+    <section className="mt-8 pt-6">
       <h2 className="text-base font-medium">Пригласить друга</h2>
       <p className="mt-1 text-sm text-gray-500">
         Поделитесь приглашением — друг сможет добавить вас и видеть ваши списки желаний.
@@ -108,7 +108,7 @@ export function CreateInviteSection() {
         <div className="flex items-center gap-3">
           <span className="text-2xl leading-none">🎁</span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900">Приглашение в SimpleWish</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Приглашение в SimpleWish</p>
             <p className="text-xs text-gray-400">Готовый текст со ссылкой</p>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function CreateInviteSection() {
             type="button"
             onClick={handleCopy}
             disabled={isLoading || pending}
-            className="rounded-full border border-gray-200 px-4 py-1.5 text-sm text-gray-700 disabled:opacity-40"
+            className="rounded-full border border-gray-200 dark:border-[#323234] px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-40"
           >
             Скопировать
           </button>
@@ -125,7 +125,7 @@ export function CreateInviteSection() {
             type="button"
             onClick={handleShare}
             disabled={isLoading || pending}
-            className="rounded-full border border-gray-200 px-4 py-1.5 text-sm text-gray-700 disabled:opacity-40"
+            className="rounded-full border border-gray-200 dark:border-[#323234] px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-40"
           >
             Поделиться
           </button>

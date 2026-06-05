@@ -37,7 +37,7 @@ export default async function FriendProfilePage({
 
   return (
     <main className="px-4 pb-10 pt-4">
-      <Link href="/friends" className="text-sm text-gray-600">
+      <Link href="/friends" className="text-sm text-gray-600 dark:text-gray-400">
         ‹ Друзья
       </Link>
 
@@ -54,9 +54,9 @@ export default async function FriendProfilePage({
               <li key={w.id}>
                 <Link
                   href={`/wishlists/${w.id}?fromFriend=${friendId}`}
-                  className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3"
+                  className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#323234] px-4 py-3"
                 >
-                  <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{w.title}</p>
                   <span className="text-gray-400">›</span>
                 </Link>
               </li>

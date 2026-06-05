@@ -133,7 +133,7 @@ export default async function FriendsPage() {
 
       {friends.length === 0 ? (
         <div className="mt-10 flex flex-col items-center gap-2 text-center">
-          <p className="text-base font-medium text-gray-800">
+          <p className="text-base font-medium text-gray-800 dark:text-gray-200">
             У вас пока нет друзей
           </p>
           <p className="max-w-xs text-sm text-gray-500">
@@ -152,7 +152,7 @@ export default async function FriendsPage() {
               : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
             return (
               <li key={friend.id}>
-                {i > 0 && <div className="ml-[68px] h-px bg-[#f3f4f6]" />}
+                {i > 0 && <div className="row-divider" />}
                 <Link
                   href={`/friends/${friend.id}`}
                   className="flex items-center gap-3 px-4 py-3"
@@ -162,13 +162,13 @@ export default async function FriendsPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center bg-gray-200 text-sm font-semibold text-gray-600">
+                      <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
                         {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
                       </span>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{friend.name} {friend.surname}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
                     {subline && <p className="text-xs text-gray-400">{subline}</p>}
                   </div>
                   <span className="shrink-0 text-gray-400">›</span>

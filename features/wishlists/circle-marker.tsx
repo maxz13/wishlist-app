@@ -42,7 +42,7 @@ export function CircleMarker({ state, itemId, wishlistId }: CircleMarkerProps) {
 
   if (state === 'other') {
     return (
-      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100">
+      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700">
         <Gift size={10} className="text-gray-400" />
       </div>
     )

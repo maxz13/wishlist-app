@@ -101,7 +101,7 @@ export default async function WishlistsPage() {
 
       {wishlists.length === 0 ? (
         <div className="mt-10 flex flex-col items-center gap-2 text-center">
-          <p className="text-base font-medium text-gray-800">
+          <p className="text-base font-medium text-gray-800 dark:text-gray-200">
             Вишлистов пока нет
           </p>
           <p className="max-w-xs text-sm text-gray-500">
@@ -112,7 +112,7 @@ export default async function WishlistsPage() {
         <ul className="mt-4 grouped-card">
           {wishlists.map((w, i) => (
             <li key={w.id}>
-              {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+              {i > 0 && <div className="row-divider" />}
               <WishlistCard
                 id={w.id}
                 title={w.title}
@@ -136,7 +136,7 @@ export default async function WishlistsPage() {
               const count = sharedItemCountMap.get(w.id) ?? 0
               return (
                 <li key={w.id}>
-                  {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                  {i > 0 && <div className="row-divider" />}
                   <Link
                     href={`/wishlists/${w.id}`}
                     className="flex items-center justify-between px-4 py-3"
@@ -146,7 +146,7 @@ export default async function WishlistsPage() {
                         {newAccessIds.has(w.id) && (
                           <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />
                         )}
-                        <p className="text-sm font-medium text-gray-900">{w.title}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{w.title}</p>
                       </div>
                       {ownerById.get(w.owner_id) && (
                         <p className="mt-0.5 text-xs text-gray-500">
@@ -178,7 +178,7 @@ export default async function WishlistsPage() {
           <ul className="grouped-card">
             {archived.map((w, i) => (
               <li key={w.id}>
-                {i > 0 && <div className="h-px bg-[#f3f4f6]" />}
+                {i > 0 && <div className="row-divider" />}
                 <WishlistCard
                   id={w.id}
                   title={w.title}

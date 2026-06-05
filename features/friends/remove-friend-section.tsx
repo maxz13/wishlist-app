@@ -24,7 +24,7 @@ export function RemoveFriendSection({ friendId }: RemoveFriendSectionProps) {
   }
 
   return (
-    <div className="mt-6 border-t border-gray-100 pt-4">
+    <div className="mt-6 border-t border-gray-100 dark:border-[#323234] pt-4">
       {!confirming ? (
         <button
           type="button"
@@ -35,7 +35,7 @@ export function RemoveFriendSection({ friendId }: RemoveFriendSectionProps) {
         </button>
       ) : (
         <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium text-gray-900">Удалить друга?</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Удалить друга?</p>
           <p className="text-xs text-gray-500">
             После удаления вы больше не будете видеть вишлисты друг друга и не сможете резервировать подарки.
           </p>

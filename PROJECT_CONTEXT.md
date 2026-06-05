@@ -10,7 +10,7 @@
 Users create wishlists, friends reserve items to avoid duplicate gifts.
 
 Stack: Next.js App Router · TypeScript · Tailwind v4 · lucide-react · Supabase (Postgres, Auth, RLS, Storage) · Vercel  
-Language: Russian UI · Mobile-first · iOS-native feel · Light theme only  
+Language: Russian UI · Mobile-first · iOS-native feel · System-preference dark mode (no toggle)  
 Production: `https://www.simplewish.es` · Vercel project: `wishlist-app` (max-zavyalov-s-projects)
 
 Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touching anything.
@@ -53,14 +53,28 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Branding: SimpleWish logo (`public/brand/simplewish-logo.png`) on login/register; `h-11 mb-9`
 - Font: Inter via `next/font/google` (latin + cyrillic); `--font-inter`; Geist Mono for `font-mono`
 - Section headers: `.section-title` (1.0625rem / 600 / #111827) on all major headings. "Лента" not yet migrated.
-- Design system CSS (`app/globals.css`): `.section-title`, `.grouped-card`, `.feed-bullet`, `.grouped-card-divider`, `font-size: 16px !important` on all inputs/textarea/select (mobile zoom prevention)
+- Design system CSS (`app/globals.css`): CSS custom properties for theming — `:root` defines `--background`, `--foreground`, `--card`, `--card-border`, `--card-shadow`, `--text-primary`, `--nav-bg`, `--divider`; `@media (prefers-color-scheme: dark)` overrides all of them. Utility classes: `.section-title`, `.grouped-card` (uses `var(--card)`, `var(--card-border)`, `var(--card-shadow)`), `.feed-bullet`. Three divider classes: `.grouped-card-divider` (feed rows, 90% centered, `var(--divider)`), `.row-divider` (full-width entity rows, `var(--divider)`), `.item-divider` (wish rows in detail card, 90% centered, static `#e5e7eb` light / `#3a3a3c` dark). `font-size: 16px !important` on all inputs/textarea/select (mobile zoom prevention).
 - Mobile PWA: viewport export in `app/layout.tsx` sets `maximumScale: 1, userScalable: false`; `bg-[#fafafa]` on both `html` and `body`; `.grouped-card` stays `#ffffff`
 - iOS Keychain autocomplete fix: `register-form.tsx` — email field `autoComplete="email username"`, username `autoComplete="nickname"`, password `autoComplete="new-password"`
 - Email confirmation: Resend configured as custom SMTP provider in Supabase dashboard (`smtp.resend.com`, port 465, API key as password). Supabase built-in mailer is NOT used.
+- Dark mode: system-preference only (`@media (prefers-color-scheme: dark)`, no toggle, no ThemeProvider, no localStorage). All surfaces use CSS custom properties; Tailwind `dark:` classes for one-off values (e.g. `dark:border-[#323234]`, `dark:bg-[#2c2c2e]`). Applied across all app pages, nav, and feature components. Auth pages intentionally excluded.
+- Wishlist detail UI: wish rows (owner + friend views) wrapped in `.grouped-card` with `.item-divider` between rows and `px-4` per row; `CreateItemSection` rendered as first row inside the grouped-card (with `item-divider` above each wish); expanded create and edit forms both expand inline — no nested card surface; `OwnerItemList` always rendered for owners (no `items.length > 0` guard); hidden item indicator: `EyeOff` (lucide-react, size 16, `text-gray-400 dark:text-gray-500`) as left flex item when `isDraft && !showEditFields`; rows without price use `items-center` alignment; `WishlistAccessSection` wrapped in `.grouped-card px-4 py-4`; archive/restore buttons restyled as full-width `rounded-xl border` secondary buttons.
 
 ---
 
 ## Current focus
+
+Session 2026-06-05 (continued, part 2). All changes deployed to production on `main`.
+
+Dark mode + wishlist detail UI polish + auto-save optimization:
+- Dark mode: CSS custom properties (`--background`, `--foreground`, `--card`, `--card-border`, `--card-shadow`, `--text-primary`, `--nav-bg`, `--divider`) in `globals.css`; `@media (prefers-color-scheme: dark)` overrides; applied across all 15 app files
+- Three divider classes in `globals.css`: `.grouped-card-divider` (feed, 90% centered), `.row-divider` (full-width entity rows), `.item-divider` (wish rows, 90% centered, static color values)
+- Wishlist detail wish rows wrapped in `.grouped-card`; `CreateItemSection` moved inside the card as first row; both create and edit forms expand inline (no nested card)
+- Hidden item indicator: `EyeOff` (lucide-react, size 16) in owner item row when `isDraft && !showEditFields`
+- Vertical alignment: `items-center` on collapsed wish rows (owner + friend views) so title-only items center within row height; `items-start` preserved in edit state only
+- `WishlistAccessSection`: both collapsed and expanded states wrapped in `.grouped-card px-4 py-4`
+- Archive/restore: `border-t` separator removed; full-width `rounded-xl border` secondary button style
+- Auto-save dirty check in `OwnerItemRow.doSave()`: skips `updateWishlistItemAction` and calls `onCollapse()` directly when title/price/link are all unchanged
 
 Session 2026-06-05 (continued). All changes deployed to production on `main` (commit `2aed9bc`).
 
@@ -214,14 +228,14 @@ Remaining work:
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.
 - **Item count pattern:** Separate query `select('wishlist_id').in(...)` → `Map<string, number>`. Duplicated across pages; refactor deferred.
 - **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`. Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
-- **Wishlist divider pattern:** feed = `.grouped-card-divider` (90% centered); friend/search rows = `ml-[68px] h-px bg-[#f3f4f6]`; wishlists/Я подарю = `h-px bg-[#f3f4f6]` (full-width).
+- **Divider system (three CSS classes):** `.grouped-card-divider` — feed rows, 90% centered, `var(--divider)`. `.row-divider` — full-width entity rows (friends list, search results, wishlists/"Я подарю"), `var(--divider)`. `.item-divider` — wish rows inside wishlist detail grouped-card, 90% centered, static `#e5e7eb` light / `#3a3a3c` dark (not CSS-var to preserve distinct visual weight from feed dividers).
 - **Friend search architecture:** `SearchSection` client component uses `getSupabaseBrowserClient()` for live RPC. Mutations via server actions + `revalidatePath('/friends')`. State classification derived from server props; updated optimistically.
 - **Search status derivation:** `effectiveStatus = query.length < 2 ? 'idle' : status` — derived in render, avoids `react-hooks/set-state-in-effect` lint error.
 - **`friendships` RLS:** `USING (user_id = auth.uid())` — only current user's rows returned.
 - **`accept_invite` gap:** does not clean up `friend_requests` when users connect via invite link. Cleanup SQL: `DELETE FROM friend_requests fr WHERE EXISTS (SELECT 1 FROM friendships f WHERE f.user_id = fr.from_user_id AND f.friend_id = fr.to_user_id)`.
 - **`profiles_select_incoming_request_sender` RLS bug (fixed 2026-06-03):** policy originally used `fr.from_user_id = fr.id` instead of `fr.from_user_id = profiles.id`. Fixed on production.
 - **Bottom nav sizing system:** nav `h-[74px]`, `iconBox` `h-7 w-7` (28px), SVG icons `h-[23px] w-[23px]` (23px), `PlusIcon` `h-7 w-7` (28px), central button `h-16 w-16` (64px), raise `-mt-[18px]`. Profile avatar wrapper must match `iconBox` (`h-7 w-7`).
-- **App background:** `#fafafa` (`:root --background`, `html`, `body`). Cards (`.grouped-card`) stay `#ffffff`. Auth pages unaffected.
+- **App background:** CSS custom property `--background` (`#fafafa` light / `#111111` dark). `.grouped-card` uses `var(--card)` (`#ffffff` light / `#1c1c1e` dark). Auth pages intentionally have no dark mode — hardcoded light colors throughout.
 - **Auth guard pattern:** Every app page that calls `getUser()` must include `if (!user) redirect('/login')` immediately after, before any `user.id` access. The layout's redirect alone is not sufficient — layout and page render concurrently as Server Components, so the page can crash on null user before the layout redirect fires.
 - **Wishlist item edit card pattern:** `OwnerItemRow` receives `requestClose: boolean` + `onSaveFailed: () => void` from `OwnerItemList`. When `requestClose` fires, the row saves via `formRef` and calls `onCollapse()` on success or `onSaveFailed()` on failure. Parent uses `closingId` state to signal close without directly setting `expandedId = null`. Outside-click sets `closingId`; tapping another item sets `closingId` on the open item without opening the new one. `formRef` attached to the `<form>` so save can be triggered without a submit event.
 - **Wishlist item title editing:** `editingTitle` boolean + `titleValue` string state in `OwnerItemRow`. A `useEffect([isExpanded, item.title])` resets both when card closes. Hidden `<input type="hidden" name="title" value={titleValue} />` always present in the form — server action receives correct title whether editing or not. Title input uses `border-b border-transparent focus:border-gray-300 pb-0.5` for the edit-mode underline cue.
@@ -247,6 +261,8 @@ Remaining work:
 - **Feed privacy rule:** only `visibility = 'all_friends'` wishlists may generate activity events. `new_wishlist` filtered at DB level. `new_items` and `wishlist_item_reserved` filtered in JS after fetching `visibility` in nested select. `wishlist_access_granted` removed from feed entirely.
 - **`revalidatePath` in Server Actions vs Server Components:** `revalidatePath` is only valid in Server Actions triggered by Client Components or Route Handlers — NOT during Server Component render (crashes with "used during render" error in Safari). The friends dot pattern (Client Component → Server Action → `revalidatePath`) is the correct model for invalidating the layout.
 - **Wishlist item visibility toggle:** moved from left-column circle button to inline text button ("Спрятать" gray-500 / "Показать" blue-500) always visible in the row, right of title, left of ⋯. Hidden when edit form is expanded or in delete-confirmation state.
+- **Wishlist item auto-save dirty check:** `doSave()` in `OwnerItemRow` compares `titleValue` vs `item.title`, `formData.get('price')` vs `item.price !== null ? String(item.price) : ''`, and `formData.get('link')` vs `item.link ?? ''` before calling `updateWishlistItemAction`. If all three match, `onCollapse()` is called directly and the function returns — no action invoked, no DB write, no `revalidatePath`. Applies on both manual outside-clicks and the `requestClose` signal.
+- **Dark mode approach:** `@media (prefers-color-scheme: dark)` only — no ThemeProvider, no toggle, no `class="dark"`, no localStorage. All primary surface values use CSS custom properties. Tailwind `dark:` utility classes for one-off values. Auth pages intentionally excluded from dark mode styling.
 
 ---
 

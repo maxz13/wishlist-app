@@ -62,7 +62,7 @@ export function ItemEditForm({ item, wishlistId, backHref }: ItemEditFormProps) 
             defaultValue={item.title}
             required
             disabled={anyPending}
-            className="border-b border-gray-200 bg-transparent pb-2 text-[15px] font-medium text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-50"
+            className="border-b border-gray-200 dark:border-[#323234] bg-transparent pb-2 text-[15px] font-medium text-gray-900 dark:text-gray-100 focus:border-gray-400 focus:outline-none disabled:opacity-50"
           />
           {updateState?.errors?.title && (
             <p className="text-xs text-red-600">{updateState.errors.title[0]}</p>
@@ -79,7 +79,7 @@ export function ItemEditForm({ item, wishlistId, backHref }: ItemEditFormProps) 
             defaultValue={item.link ?? ''}
             placeholder="https://..."
             disabled={anyPending}
-            className="border-b border-gray-200 bg-transparent pb-2 text-sm text-gray-700 placeholder-gray-300 focus:border-gray-400 focus:outline-none disabled:opacity-50"
+            className="border-b border-gray-200 dark:border-[#323234] bg-transparent pb-2 text-sm text-gray-700 dark:text-gray-300 placeholder-gray-300 focus:border-gray-400 focus:outline-none disabled:opacity-50"
           />
           {updateState?.errors?.link && (
             <p className="text-xs text-red-600">{updateState.errors.link[0]}</p>
@@ -98,7 +98,7 @@ export function ItemEditForm({ item, wishlistId, backHref }: ItemEditFormProps) 
             defaultValue={item.price ?? ''}
             placeholder="—"
             disabled={anyPending}
-            className="border-b border-gray-200 bg-transparent pb-2 text-sm text-gray-700 placeholder-gray-300 focus:border-gray-400 focus:outline-none disabled:opacity-50"
+            className="border-b border-gray-200 dark:border-[#323234] bg-transparent pb-2 text-sm text-gray-700 dark:text-gray-300 placeholder-gray-300 focus:border-gray-400 focus:outline-none disabled:opacity-50"
           />
           {updateState?.errors?.price && (
             <p className="text-xs text-red-600">{updateState.errors.price[0]}</p>
@@ -112,13 +112,13 @@ export function ItemEditForm({ item, wishlistId, backHref }: ItemEditFormProps) 
         <button
           type="submit"
           disabled={anyPending}
-          className="rounded-xl bg-gray-900 py-3 text-sm font-medium text-white disabled:opacity-40"
+          className="rounded-xl bg-gray-900 dark:bg-white py-3 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-40"
         >
           {updatePending ? 'Сохранение…' : 'Сохранить'}
         </button>
       </form>
 
-      <div className="mt-10 border-t border-gray-100 pt-6">
+      <div className="mt-10 border-t border-gray-100 dark:border-[#323234] pt-6">
         <button
           type="button"
           onClick={handleDelete}
