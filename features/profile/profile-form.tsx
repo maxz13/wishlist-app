@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { logoutAction } from '@/features/auth/actions'
 import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction } from './actions'
 import type { UpdateProfileState, ChangePasswordState } from './actions'
 
@@ -236,23 +237,33 @@ export function ProfileForm({ profile }: Props) {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={avatarLoading}
-          className="text-sm text-[#2563eb] disabled:opacity-50"
-        >
-          {avatarLoading ? 'Загрузка...' : 'Изменить фото'}
-        </button>
-
-        {avatarUrl && (
+        {avatarUrl ? (
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarLoading}
+              className="text-sm text-[#2563eb] disabled:opacity-50"
+            >
+              {avatarLoading ? 'Загрузка...' : 'Изменить фото'}
+            </button>
+            <button
+              type="button"
+              onClick={handleAvatarRemove}
+              disabled={avatarLoading}
+              className="text-sm text-red-400 disabled:opacity-50"
+            >
+              Удалить
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            onClick={handleAvatarRemove}
+            onClick={() => fileInputRef.current?.click()}
             disabled={avatarLoading}
-            className="text-sm text-gray-400 disabled:opacity-50"
+            className="text-sm text-[#2563eb] disabled:opacity-50"
           >
-            Удалить фото
+            {avatarLoading ? 'Загрузка...' : 'Добавить фото'}
           </button>
         )}
 
@@ -269,22 +280,13 @@ export function ProfileForm({ profile }: Props) {
         />
       </section>
 
-      {/* ── Username — read-only, immutable after registration ── */}
-      <section>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Никнейм</p>
-        <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">@{profile.username}</p>
-        <p className="mt-1 text-xs text-gray-400">
-          Никнейм используется для поиска друзей и не может быть изменён.
-        </p>
-      </section>
-
       {/* ── Edit form ── */}
       <section>
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
           <div className="grouped-card">
 
-            <div className="px-4 py-3">
+            <div className="px-4 py-2.5">
               <label className="text-xs font-medium text-gray-500">Имя</label>
               <input
                 name="name"
@@ -301,7 +303,7 @@ export function ProfileForm({ profile }: Props) {
 
             <div className="row-divider" />
 
-            <div className="px-4 py-3">
+            <div className="px-4 py-2.5">
               <label className="text-xs font-medium text-gray-500">Фамилия</label>
               <input
                 name="surname"
@@ -318,7 +320,7 @@ export function ProfileForm({ profile }: Props) {
 
             <div className="row-divider" />
 
-            <div className="px-4 py-3">
+            <div className="px-4 py-2.5">
               <label className="text-xs font-medium text-gray-500">День рождения</label>
               <input
                 name="birthday"
@@ -333,7 +335,7 @@ export function ProfileForm({ profile }: Props) {
 
             <div className="row-divider" />
 
-            <div className="px-4 py-3">
+            <div className="px-4 py-2.5">
               <label className="text-xs font-medium text-gray-500">Email</label>
               <p className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">{profile.email}</p>
               <p className="mt-0.5 text-xs text-gray-400">Изменение email появится в следующей версии.</p>
@@ -356,6 +358,18 @@ export function ProfileForm({ profile }: Props) {
             {pending ? 'Сохранение...' : 'Сохранить'}
           </button>
 
+        </form>
+      </section>
+
+      {/* ── Logout ── */}
+      <section>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-red-500 dark:text-red-400"
+          >
+            Выйти из аккаунта
+          </button>
         </form>
       </section>
 

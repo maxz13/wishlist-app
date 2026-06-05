@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useActionState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { registerAction } from './actions'
 import type { RegisterFormState } from './schemas'
 
@@ -31,6 +32,8 @@ export function RegisterForm({ next }: { next?: string }) {
   const [surname, setSurname] = useState('')
   const [email, setEmail] = useState('')
   const [birthday, setBirthday] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
   const [usernameManual, setUsernameManual] = useState(false)
 
@@ -124,7 +127,13 @@ export function RegisterForm({ next }: { next?: string }) {
           placeholder="ДД.ММ.ГГГГ"
           required
           value={birthday}
-          onChange={(e) => setBirthday(e.target.value)}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 8)
+            let formatted = digits
+            if (digits.length > 2) formatted = digits.slice(0, 2) + '.' + digits.slice(2)
+            if (digits.length > 4) formatted = formatted.slice(0, 5) + '.' + formatted.slice(5)
+            setBirthday(formatted)
+          }}
           className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
         />
         {state?.errors?.birthday && (
@@ -155,14 +164,26 @@ export function RegisterForm({ next }: { next?: string }) {
         <label htmlFor="password" className="text-sm font-medium">
           Пароль
         </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="new-password"
-          required
-          className="w-full rounded border border-gray-300 px-3 py-2 text-sm"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded border border-gray-300 px-3 py-2 pr-10 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         {state?.errors?.password && (
           <p className="text-xs text-red-600">{state.errors.password[0]}</p>
         )}

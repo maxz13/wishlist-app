@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logoutAction } from '@/features/auth/actions'
 import { BottomNav } from './bottom-nav'
-import { LogOut } from 'lucide-react'
 
 export default async function AppLayout({
   children,
@@ -57,8 +56,8 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-white dark:bg-[#1c1c1e] px-4 py-3">
-        <div className="flex min-w-0 flex-1 items-center gap-3 mr-4">
+      <header className="sticky top-0 z-10 flex items-center bg-white dark:bg-[#1c1c1e] px-4 py-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           {profile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -80,11 +79,6 @@ export default async function AppLayout({
             </p>
           </div>
         </div>
-        <form action={logoutAction}>
-          <button type="submit" aria-label="Выйти" className="shrink-0 text-gray-500 dark:text-gray-400">
-            <LogOut size={18} />
-          </button>
-        </form>
       </header>
 
       <div className="flex-1 pb-24">{children}</div>
