@@ -1,81 +1,142 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { createInviteAction } from './actions'
-import type { CreateInviteState } from './actions'
 
-function shortenInviteUrl(url: string): string {
+function buildShareText(firstName: string, inviteUrl: string): string {
+  const name = firstName.trim() || 'Ваш друг'
+  return `${name} приглашает вас в SimpleWish 🎁\n\nПодружитесь в приложении, чтобы видеть списки желаний друг друга.\n\n${inviteUrl}`
+}
+
+// Tries navigator.clipboard first; falls back to textarea + execCommand for Safari
+// and other restricted contexts. Both methods are called synchronously from the
+// user gesture — no awaited network call may precede this.
+async function copyToClipboard(text: string): Promise<boolean> {
   try {
-    const parsed = new URL(url)
-    const token = parsed.pathname.split('/').pop() ?? ''
-    return `${parsed.host}/invite/${token.slice(0, 8)}···`
+    await navigator.clipboard.writeText(text)
+    return true
   } catch {
-    return url
+    try {
+      const el = document.createElement('textarea')
+      el.value = text
+      el.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+      document.body.appendChild(el)
+      el.focus()
+      el.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(el)
+      return ok
+    } catch {
+      return false
+    }
   }
 }
 
 export function CreateInviteSection() {
-  const [state, setState] = useState<CreateInviteState>(undefined)
-  const [pending, startTransition] = useTransition()
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [firstName, setFirstName] = useState('')
+  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [pending, startTransition] = useTransition()
 
-  function handleClick() {
+  // Pre-generate the invite URL on mount so that clipboard.writeText()
+  // is called synchronously within the user gesture (required by Safari).
+  useEffect(() => {
+    let cancelled = false
+    createInviteAction().then((result) => {
+      if (cancelled) return
+      if (result?.inviteUrl) {
+        setInviteUrl(result.inviteUrl)
+        setFirstName(result.firstName ?? '')
+      } else {
+        setError(result?.error ?? 'Не удалось создать ссылку.')
+      }
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // true while pre-generation is in flight
+  const isLoading = inviteUrl === null && error === null
+
+  function showCopied() {
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handleCopy() {
+    if (!inviteUrl) return
+    setError(null)
+    // Build text synchronously — no await before copyToClipboard
+    const text = buildShareText(firstName, inviteUrl)
     startTransition(async () => {
-      const result = await createInviteAction()
-      setState(result)
-      setCopied(false)
+      const ok = await copyToClipboard(text)
+      if (ok) showCopied()
+      else setError('Не удалось скопировать. Попробуйте ещё раз.')
     })
   }
 
-  async function handleCopy() {
-    if (!state?.inviteUrl) return
-    await navigator.clipboard.writeText(state.inviteUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  function handleShare() {
+    if (!inviteUrl) return
+    setError(null)
+    const text = buildShareText(firstName, inviteUrl)
+    startTransition(async () => {
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ text })
+        } catch (e) {
+          if (e instanceof Error && e.name !== 'AbortError') {
+            const ok = await copyToClipboard(text)
+            if (ok) showCopied()
+          }
+        }
+      } else {
+        const ok = await copyToClipboard(text)
+        if (ok) showCopied()
+        else setError('Не удалось скопировать. Попробуйте ещё раз.')
+      }
+    })
   }
 
   return (
     <section className="mt-8 border-t border-gray-200 pt-6">
       <h2 className="text-base font-medium">Пригласить друга</h2>
       <p className="mt-1 text-sm text-gray-500">
-        Поделитесь ссылкой — друг увидит ваши вишлисты после регистрации.
+        Поделитесь приглашением — друг сможет добавить вас и видеть ваши списки желаний.
       </p>
 
-      <div className="mt-4">
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={pending}
-          className="rounded bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {pending ? 'Создание...' : 'Создать ссылку-приглашение'}
-        </button>
-      </div>
-
-      {state?.error && (
-        <p className="mt-3 text-sm text-red-600">{state.error}</p>
-      )}
-
-      {state?.inviteUrl && (
-        <div className="mt-4 flex flex-col gap-2">
-          <p className="text-sm text-gray-700">Ваша ссылка-приглашение:</p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm text-gray-900">
-              {shortenInviteUrl(state.inviteUrl)}
-            </div>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="shrink-0 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700"
-            >
-              Скопировать
-            </button>
+      <div className="grouped-card mt-4 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl leading-none">🎁</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900">Приглашение в SimpleWish</p>
+            <p className="text-xs text-gray-400">Готовый текст со ссылкой</p>
           </div>
-          {copied && (
-            <p className="text-xs text-green-700">Ссылка скопирована</p>
-          )}
         </div>
-      )}
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={isLoading || pending}
+            className="rounded-full border border-gray-200 px-4 py-1.5 text-sm text-gray-700 disabled:opacity-40"
+          >
+            Скопировать
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={isLoading || pending}
+            className="rounded-full border border-gray-200 px-4 py-1.5 text-sm text-gray-700 disabled:opacity-40"
+          >
+            Поделиться
+          </button>
+        </div>
+        {copied && (
+          <p className="mt-2 text-xs text-green-700">✓ Приглашение скопировано</p>
+        )}
+        {error && (
+          <p className="mt-2 text-xs text-red-600">{error}</p>
+        )}
+      </div>
     </section>
   )
 }

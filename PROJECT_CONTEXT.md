@@ -33,7 +33,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
   - `wishlist_item_reserved` — someone reserved one of the owner's items; random label from 4 variants; two-line format
   - `wishlist_access_granted` — a friend added the current user to a private wishlist; two-line format (owner name + wishlist title)
   - Wrapped in `.grouped-card` with `.feed-bullet` per row and `.grouped-card-divider` between rows
-- Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); live username search (2-char threshold, 300ms debounce, `search_profiles_by_username_prefix` RPC, browser Supabase client); search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />` preserved
+- Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); live username search (2-char threshold, 300ms debounce, `search_profiles_by_username_prefix` RPC, browser Supabase client); search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />`: card with 🎁 emoji, "Скопировать" + "Поделиться" pill buttons, invite URL pre-generated on mount, formatted message with sender's first name
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
 - My Wishlists section (Home): `.grouped-card`, title + item count below, numeric count before `›`, full-width dividers
 - Я подарю section (Home): `.grouped-card`, gift title line 1, `Для {ownerName}` line 2, `›`, full-width dividers
@@ -63,6 +63,24 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 ## Current focus
 
 Session 2026-06-05 (continued). All changes deployed to production on `main` (commit `2aed9bc`).
+
+Invite UI redesign (2026-06-05):
+- `CreateInviteSection` rewritten: card with 🎁 emoji, title "Приглашение в SimpleWish", subtitle "Готовый текст со ссылкой"
+- Two `rounded-full` pill buttons: "Скопировать" + "Поделиться" — always visible simultaneously, never hidden
+- Invite URL pre-generated on mount (`useEffect`) — avoids async before clipboard call (Safari `NotAllowedError` fix)
+- Share message: `"{firstName} приглашает вас в SimpleWish 🎁\n\n...\n\n{url}"` — fallback name `"Ваш друг"` if profile name empty
+- `createInviteAction` now returns `{ inviteUrl, firstName }` — queries `profiles.name` on the authenticated user
+- `copyToClipboard`: `navigator.clipboard.writeText` with `textarea + execCommand` fallback for restricted contexts
+- `handleShare`: `navigator.share({ text })` if available; falls back to `copyToClipboard`; `AbortError` silently ignored
+- Inline feedback: "✓ Приглашение скопировано" for 2s; inline error on failure; no modal
+
+Bottom spacing fix (2026-06-05):
+- Layout wrapper `pb-16` → `pb-24` (96px) in `app/(app)/layout.tsx` — fixes last-content-block clipping against fixed bottom nav (74px)
+- Pages with `p-4` main (friends, wishlists list): clearance above nav 6px → 38px; pages with `pb-10` main: 30px → 62px
+
+Documentation (2026-06-05):
+- `SWIFT_PORTING_NOTES.md` created — iOS porting reference for platform-specific pitfalls, UX invariants, and implementation lessons
+- `AI_RULES.md` — `SWIFT_PORTING_NOTES.md Policy` section added defining what belongs and the filter test
 
 Leave invited wishlist (2026-06-05):
 - Invited (non-owner) user can leave a `selected_friends` wishlist via "Покинуть вишлист" button at bottom of wishlist detail page
@@ -224,6 +242,8 @@ Remaining work:
 - **`leave_wishlist_access` RPC:** SECURITY DEFINER, no DELETE RLS for invited users. WHERE clause: `wishlist_id = p_wishlist_id AND user_id = auth.uid()`. Guard: `auth.uid() IS NOT NULL`. After leaving, RLS via `can_friend_see_wishlist()` immediately blocks access.
 - **`leaveWishlistAction` error handling:** destructures `{ error }` from `supabase.rpc()`; returns early on error (user stays on page); `redirect('/wishlists')` only fires on success.
 - **Friend removal UX placement:** only on `/friends/[friendId]` detail page — not on the friends list page. Reduces accidental removal risk.
+- **Invite pre-generation (Safari clipboard fix):** `CreateInviteSection` calls `createInviteAction()` in `useEffect` on mount so the invite URL is ready before the user taps. `copyToClipboard` is then called synchronously within the gesture handler — no `await` between gesture and clipboard. Safari WebKit revokes clipboard permission after any significant async gap. `textarea + execCommand` fallback handles remaining restricted contexts.
+- **Bottom nav clearance:** layout wrapper is `pb-24` (96px). Fixed bottom nav is `h-[74px]`. Minimum clearance above nav = page `<main>` bottom padding + 96px − 74px. List pages (`p-4`) get 38px; detail pages (`pb-10`) get 62px. Do not reduce `pb-24` without rechecking all pages.
 - **Feed privacy rule:** only `visibility = 'all_friends'` wishlists may generate activity events. `new_wishlist` filtered at DB level. `new_items` and `wishlist_item_reserved` filtered in JS after fetching `visibility` in nested select. `wishlist_access_granted` removed from feed entirely.
 - **`revalidatePath` in Server Actions vs Server Components:** `revalidatePath` is only valid in Server Actions triggered by Client Components or Route Handlers — NOT during Server Component render (crashes with "used during render" error in Safari). The friends dot pattern (Client Component → Server Action → `revalidatePath`) is the correct model for invalidating the layout.
 - **Wishlist item visibility toggle:** moved from left-column circle button to inline text button ("Спрятать" gray-500 / "Показать" blue-500) always visible in the row, right of title, left of ⋯. Hidden when edit form is expanded or in delete-confirmation state.

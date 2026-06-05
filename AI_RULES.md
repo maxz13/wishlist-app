@@ -255,6 +255,35 @@ If the answer is already defined in the project documents, Claude should follow 
 
 ---
 
+## SWIFT_PORTING_NOTES.md Policy
+
+**Purpose:** `SWIFT_PORTING_NOTES.md` stores platform-specific pitfalls, native UX invariants, cross-platform behavior requirements, implementation lessons learned from bugs, and decisions that are easy to lose during a future rewrite.
+
+**Examples of what belongs:**
+- Safari clipboard restrictions and the lesson they taught
+- Share API / native share sheet behavior
+- Safe area requirements
+- Destructive action UX patterns
+- Navigation behavior expectations
+- UX feedback patterns (inline vs. modal)
+
+**Do NOT store:**
+- Feature descriptions
+- Business logic
+- Database structure
+- RLS behavior
+- Visibility rules
+- Architecture descriptions
+- Activity feed implementation details
+- User stories
+- Project history
+
+**Test before adding a note:** "Would a future Swift developer likely miss this even after reading the code and PROJECT_CONTEXT.md?"
+- If yes → add it.
+- If no → do not add it.
+
+---
+
 # Final Instruction
 
 When in doubt, choose:

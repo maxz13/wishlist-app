@@ -87,7 +87,7 @@ export default async function AppLayout({
         </form>
       </header>
 
-      <div className="flex-1 pb-16">{children}</div>
+      <div className="flex-1 pb-24">{children}</div>
 
       <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} hasUnreadInvitedWishlists={(unseenWishlistCount ?? 0) > 0} />
     </div>

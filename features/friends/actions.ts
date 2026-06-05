@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export type CreateInviteState =
-  | { inviteUrl?: string; error?: string }
+  | { inviteUrl?: string; firstName?: string; error?: string }
   | undefined
 
 export async function createInviteAction(): Promise<CreateInviteState> {
@@ -43,7 +43,14 @@ export async function createInviteAction(): Promise<CreateInviteState> {
   const protocol = forwarded ? forwarded.split(',')[0].trim() : 'http'
   const inviteUrl = `${protocol}://${host}/invite/${token}`
 
-  return { inviteUrl }
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name')
+    .eq('id', user.id)
+    .single()
+  const firstName = (profile?.name as string | null) ?? ''
+
+  return { inviteUrl, firstName }
 }
 
 export async function sendFriendRequestAction(toUserId: string): Promise<{ error?: string }> {
