@@ -62,6 +62,33 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
+Session 2026-06-05 complete. All changes deployed to production on `main` (commit `67ab839`).
+
+Feed privacy fix (2026-06-05):
+- All private/selected_friends wishlist activity removed from Home feed
+- `new_wishlist`: DB-level `.eq('visibility', 'all_friends')` filter added
+- `new_items`: `visibility` added to nested `wishlists!inner(...)` select; JS filter extended
+- `wishlist_item_reserved`: same pattern — `visibility` in nested select + JS filter
+- `wishlist_access_granted` event type removed from feed entirely (always `selected_friends` by definition)
+
+Invited wishlist section (2026-06-05):
+- Section renamed "Доступные вам" → "Вишлисты по приглашению"; page title "Вишлисты" → "Мои вишлисты"
+- Owner name now shown under each invited wishlist card: "от Имя Фамилия"
+- Owner profiles fetched via separate `profiles.select('id, name, surname').in('id', ownerIds)` query (NOT via `profiles!inner` on sharedResult — that caused the section to silently disappear)
+- Profiles and item-count queries run in parallel via `Promise.all` inside the `sharedWishlists.length > 0` block
+
+Invitation notification / unread dot (2026-06-05):
+- `wishlist_access.seen_at timestamptz DEFAULT NULL` column added (migration 20260604000000, applied to DB manually)
+- `mark_wishlist_access_seen(p_wishlist_id uuid)` SECURITY DEFINER RPC added — updates only `seen_at`, only for `auth.uid()`, only where `seen_at IS NULL AND auth.uid() IS NOT NULL`; no broad UPDATE RLS policy
+- Existing rows backfilled as seen (`COALESCE(created_at, now())`) at migration time to avoid surprise dots
+- `wishlist_access_self_select` policy (already present) allows invited users to read their own unseen rows
+- Green dot (left of title) on invited wishlist cards in "Вишлисты по приглашению"
+- Green dot on bottom nav "Вишлисты" icon when any unseen invited wishlist exists
+- `MarkWishlistSeenEffect` client component (`features/wishlists/mark-seen-effect.tsx`) fires `markWishlistSeenAction` in `useEffect` on wishlist detail page mount — replaces the invalid Server Component render call
+- `markWishlistSeenAction` calls `revalidatePath('/wishlists')` — legal because triggered from Client Component; causes layout to re-render with fresh `unseenWishlistCount` on return to `/wishlists`
+- Layout fetches unseen count via `wishlist_access.select('*', {count:'exact',head:true}).eq('user_id',me).is('seen_at',null)` added to existing `Promise.all`
+- `hasUnreadInvitedWishlists` prop added to `BottomNav`; nav dot uses identical pattern to friend-request dot (`absolute bottom-0 right-0`, `ring-1 ring-white`)
+
 Session 2026-06-04 complete. All changes deployed to production on `main`.
 
 Auth guard fix (2026-06-04):
@@ -119,6 +146,7 @@ Remaining work:
 | 20260602000001 | Applied | Restore `is_username_available` RPC |
 | 20260603000000 | Applied | Wishlist-level visibility (`visibility` column, `wishlist_access` table, `can_friend_see_wishlist()`, updated RLS on wishlists/items/reservations) |
 | 20260603000001 | Applied | `wishlist_access.created_at` (NULLable, existing rows stay NULL) + `wishlist_access_self_select` policy |
+| 20260604000000 | Applied to DB manually (not CLI-tracked) | `wishlist_access.seen_at` column + backfill existing rows as seen + `mark_wishlist_access_seen` SECURITY DEFINER RPC |
 
 ---
 
@@ -139,7 +167,7 @@ Remaining work:
 - **Activity feed grouping:** `new_items` group by `(owner_id, wishlist_id, calendar_day)` in JS.
 - **Activity feed event types:** `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_access_granted`. All computed at query time from existing tables — no events table.
 - **`wishlist_item_reserved` label:** deterministic from reservation UUID char-code sum mod 4 — same event always shows same text across renders.
-- **`wishlist_access_granted` feed event:** appears when `wishlist_access.created_at >= 7 days ago`. Old rows have NULL `created_at` (excluded by filter). Access removal deletes the `wishlist_access` row → event vanishes automatically.
+- **`wishlist_access_granted` feed event:** REMOVED from feed (2026-06-05). All `wishlist_access` entries are `selected_friends` by definition — showing them in the feed leaks private wishlist names.
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.
 - **Item count pattern:** Separate query `select('wishlist_id').in(...)` → `Map<string, number>`. Duplicated across pages; refactor deferred.
 - **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`. Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
@@ -163,7 +191,11 @@ Remaining work:
 - **`wishlist_access` RLS:** `wishlist_access_owner` (FOR ALL) — owner controls the list. `wishlist_access_self_select` (FOR SELECT) — users can read their own access rows. Write is owner-only in both cases.
 - **Visibility action idempotency:** `updateWishlistVisibilityAction` does DELETE all `wishlist_access` rows then re-inserts. Re-saved friends get fresh `created_at` on their access rows.
 - **`selected_friends` with 0 friends:** `updateWishlistVisibilityAction` converts to `private` server-side. UI label falls back to "Только я" in collapsed state.
-- **"Доступные вам" query:** queries `wishlists` directly with `visibility = selected_friends AND NOT is_archived AND owner_id != me`. RLS (`can_friend_see_wishlist`) acts as the access gate — no need to query `wishlist_access` directly for this view.
+- **"Вишлисты по приглашению" query:** queries `wishlists` directly with `visibility = selected_friends AND NOT is_archived AND owner_id != me`. RLS (`can_friend_see_wishlist`) acts as the access gate — no need to query `wishlist_access` directly for this view. Owner profiles fetched separately via `profiles.select('id, name, surname').in('id', ownerIds)` (NOT via `profiles!inner` on sharedResult — the embedded join caused the section to disappear silently due to a PostgREST/RLS interaction).
+- **Invited wishlist unread dot:** `wishlist_access.seen_at IS NULL` = unseen. Layout fetches count, passes `hasUnreadInvitedWishlists` to `BottomNav`. Card dot from `unseenAccessResult` in `Promise.all` on wishlists page. `MarkWishlistSeenEffect` client component fires `markWishlistSeenAction` (Server Action) in `useEffect` — required because `revalidatePath` cannot be called during Server Component render. Nav dot clears after `revalidatePath('/wishlists')` causes layout re-render on return to `/wishlists`.
+- **`mark_wishlist_access_seen` RPC:** SECURITY DEFINER, no UPDATE RLS policy. WHERE clause: `wishlist_id = p_wishlist_id AND user_id = auth.uid() AND seen_at IS NULL AND auth.uid() IS NOT NULL`. After applying via SQL editor, run `NOTIFY pgrst, 'reload schema';`.
+- **Feed privacy rule:** only `visibility = 'all_friends'` wishlists may generate activity events. `new_wishlist` filtered at DB level. `new_items` and `wishlist_item_reserved` filtered in JS after fetching `visibility` in nested select. `wishlist_access_granted` removed from feed entirely.
+- **`revalidatePath` in Server Actions vs Server Components:** `revalidatePath` is only valid in Server Actions triggered by Client Components or Route Handlers — NOT during Server Component render (crashes with "used during render" error in Safari). The friends dot pattern (Client Component → Server Action → `revalidatePath`) is the correct model for invalidating the layout.
 - **Wishlist item visibility toggle:** moved from left-column circle button to inline text button ("Спрятать" gray-500 / "Показать" blue-500) always visible in the row, right of title, left of ⋯. Hidden when edit form is expanded or in delete-confirmation state.
 
 ---
