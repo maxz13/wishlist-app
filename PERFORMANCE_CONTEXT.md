@@ -208,6 +208,38 @@ before changing.
 
 ---
 
+## Friend Search RPCs
+
+### search_social_graph(p_prefix text) — SECURITY DEFINER, STABLE, LIMIT 15
+
+CTE-based friendship graph walk. Execution order:
+1. `my_friends`: direct friends of current user; guarded by `char_length(p_prefix) >= 2` — short-circuits all subsequent CTEs for short queries
+2. `fof`: 2nd-degree connections (friends of friends, excluding self + direct friends)
+3. `fofof`: 3rd-degree connections (excluding self + 1st + 2nd degree)
+4. `candidates`: union of fof + fofof with degree label
+5. JOIN `profiles`, then filter by 8 prefix conditions + ORDER BY degree, match quality, username
+
+Performance notes:
+- At current scale (< 50 friends per user), fof/fofof sets are small. No dedicated indexes on `name`/`surname` — acceptable.
+- `transliterate_ru()` called per-row for both profile field matching and the transliterated prefix. IMMUTABLE but plpgsql (not inlined by planner).
+- Transliterated query (`transliterate_ru(lower(p_prefix))`) computed once in a CTE (`translit_prefix AS (SELECT transliterate_ru(lower(p_prefix)) AS v)`), then CROSS JOINed — not recomputed per row.
+
+### search_global(p_prefix text, p_exclude_ids uuid[]) — SECURITY DEFINER, STABLE, LIMIT 20
+
+Full `profiles` table scan with exclusion list. Same 8-condition WHERE / ORDER BY as `search_social_graph`. Never called automatically — only after explicit "Искать дальше" tap. Transliterated query as inline subquery: `CROSS JOIN (SELECT transliterate_ru(lower(p_prefix)) AS v) AS tp`.
+
+### transliterate_ru(t text) — plpgsql IMMUTABLE
+
+History:
+1. Original (sql, translate-based): off-by-one in TO string → к→i instead of к→k
+2. Fix 1 (migration 20260606000001): corrected TO string, but translate() is 1-to-1 → щ→sch (wrong), х→h (wrong)
+3. Fix 2 (migration 20260606000002): rewrite as plpgsql IMMUTABLE with 33 ordered replace() calls — correct multi-char output for all characters
+4. Fix 3 (migration 20260606000003): added query-side transliteration — `transliterate_ru(lower(p_prefix))` compared against Latin fields (bidirectional matching)
+
+No functional indexes use `transliterate_ru`. No index rebuild was required after any migration.
+
+---
+
 ## Verification Checklist (completed)
 
 - [x] Build passed (`npm run build`)

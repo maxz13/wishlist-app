@@ -24,6 +24,9 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [status, setStatus] = useState<Status>('idle')
+  const [extendedMode, setExtendedMode] = useState(false)
+  const [extendedResults, setExtendedResults] = useState<SearchResult[]>([])
+  const [extendedStatus, setExtendedStatus] = useState<Status>('idle')
   const [friendIds, setFriendIds] = useState(() => new Set(initialFriendIds))
   const [outgoingIds, setOutgoingIds] = useState(() => new Set(initialOutgoingIds))
   const [incomingMap, setIncomingMap] = useState<Record<string, string>>(initialIncomingMap)
@@ -32,12 +35,19 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
-    if (query.length < 2) return
+    setExtendedMode(false)
+    setExtendedResults([])
+    setExtendedStatus('idle')
+
+    if (query.length < 2) {
+      setStatus('idle')
+      return
+    }
 
     timerRef.current = setTimeout(async () => {
       setStatus('searching')
       const supabase = getSupabaseBrowserClient()
-      const { data } = await supabase.rpc('search_profiles_by_username_prefix', { p_prefix: query })
+      const { data } = await supabase.rpc('search_social_graph', { p_prefix: query })
       setResults((data ?? []) as SearchResult[])
       setStatus('done')
     }, 300)
@@ -46,6 +56,18 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
       if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [query])
+
+  async function handleExtendedSearch() {
+    setExtendedMode(true)
+    setExtendedStatus('searching')
+    const supabase = getSupabaseBrowserClient()
+    const { data } = await supabase.rpc('search_global', {
+      p_prefix: query,
+      p_exclude_ids: results.map(r => r.id),
+    })
+    setExtendedResults((data ?? []) as SearchResult[])
+    setExtendedStatus('done')
+  }
 
   function handleSend(userId: string) {
     setOutgoingIds(prev => new Set([...prev, userId]))
@@ -58,8 +80,60 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
     startTransition(async () => { await acceptFriendRequestAction(requestId) })
   }
 
+  function renderResultRow(r: SearchResult, i: number) {
+    const isFriend = friendIds.has(r.id)
+    const isOutgoing = outgoingIds.has(r.id)
+    const incomingReqId = incomingMap[r.id]
+    return (
+      <li key={r.id}>
+        {i > 0 && <div className="row-divider" />}
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+            {r.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={r.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                {(r.name[0] + (r.surname?.[0] ?? '')).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">@{r.username}</p>
+            <p className="text-xs text-gray-400">{r.name} {r.surname}</p>
+          </div>
+          <div className="shrink-0">
+            {isFriend ? (
+              <span className="text-xs text-gray-400">Уже в друзьях</span>
+            ) : incomingReqId ? (
+              <button
+                type="button"
+                onClick={() => handleAccept(r.id, incomingReqId)}
+                className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
+              >
+                Принять
+              </button>
+            ) : isOutgoing ? (
+              <span className="text-xs text-gray-400">Запрос отправлен</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSend(r.id)}
+                className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
+              >
+                Отправить
+              </button>
+            )}
+          </div>
+        </div>
+      </li>
+    )
+  }
+
   const effectiveStatus = query.length < 2 ? 'idle' : status
-  const showCard = effectiveStatus === 'searching' || effectiveStatus === 'done'
+  const showMainCard = effectiveStatus === 'searching' || effectiveStatus === 'done'
+  const showExtendButton = effectiveStatus === 'done' && !extendedMode
+  const showExtendedCard = extendedMode && (extendedStatus === 'searching' || extendedStatus === 'done')
 
   return (
     <section className="mt-6">
@@ -69,12 +143,12 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="@никнейм"
+          placeholder="Имя или @никнейм"
           className="w-full bg-transparent px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
         />
       </div>
 
-      {showCard && (
+      {showMainCard && (
         <ul className="mt-2 grouped-card">
           {effectiveStatus === 'searching' && results.length === 0 && (
             <li className="px-4 py-3 text-sm text-gray-400">Поиск...</li>
@@ -82,56 +156,33 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
           {effectiveStatus === 'done' && results.length === 0 && (
             <li className="px-4 py-3 text-sm text-gray-400">Никого не найдено</li>
           )}
-          {results.map((r, i) => {
-            const isFriend = friendIds.has(r.id)
-            const isOutgoing = outgoingIds.has(r.id)
-            const incomingReqId = incomingMap[r.id]
-            return (
-              <li key={r.id}>
-                {i > 0 && <div className="row-divider" />}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                    {r.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.avatar_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                        {(r.name[0] + (r.surname?.[0] ?? '')).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">@{r.username}</p>
-                    <p className="text-xs text-gray-400">{r.name} {r.surname}</p>
-                  </div>
-                  <div className="shrink-0">
-                    {isFriend ? (
-                      <span className="text-xs text-gray-400">Уже в друзьях</span>
-                    ) : incomingReqId ? (
-                      <button
-                        type="button"
-                        onClick={() => handleAccept(r.id, incomingReqId)}
-                        className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
-                      >
-                        Принять
-                      </button>
-                    ) : isOutgoing ? (
-                      <span className="text-xs text-gray-400">Запрос отправлен</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleSend(r.id)}
-                        className="rounded-lg bg-gray-900 dark:bg-white px-3 py-1.5 text-xs font-medium text-white dark:text-gray-900"
-                      >
-                        Отправить
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </li>
-            )
-          })}
+          {results.map((r, i) => renderResultRow(r, i))}
         </ul>
+      )}
+
+      {showExtendButton && (
+        <button
+          type="button"
+          onClick={handleExtendedSearch}
+          className="mt-2 w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm text-[#2563eb]"
+        >
+          Искать дальше
+        </button>
+      )}
+
+      {showExtendedCard && (
+        <div className="mt-4">
+          <p className="mb-2 px-1 text-xs text-gray-400">Другие пользователи</p>
+          <ul className="grouped-card">
+            {extendedStatus === 'searching' && extendedResults.length === 0 && (
+              <li className="px-4 py-3 text-sm text-gray-400">Поиск...</li>
+            )}
+            {extendedStatus === 'done' && extendedResults.length === 0 && (
+              <li className="px-4 py-3 text-sm text-gray-400">Никого не найдено</li>
+            )}
+            {extendedResults.map((r, i) => renderResultRow(r, i))}
+          </ul>
+        </div>
       )}
     </section>
   )

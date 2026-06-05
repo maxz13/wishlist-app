@@ -33,7 +33,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
   - `wishlist_item_reserved` — someone reserved one of the owner's items; random label from 4 variants; two-line format
   - `wishlist_access_granted` — a friend added the current user to a private wishlist; two-line format (owner name + wishlist title)
   - Wrapped in `.grouped-card` with `.feed-bullet` per row and `.grouped-card-divider` between rows
-- Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); live username search (2-char threshold, 300ms debounce, `search_profiles_by_username_prefix` RPC, browser Supabase client); search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />`: card with 🎁 emoji, "Скопировать" + "Поделиться" pill buttons, invite URL pre-generated on mount, formatted message with sender's first name
+- Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); two-mode friend search — default searches 2nd + 3rd-degree social graph only (`search_social_graph` RPC); "Искать дальше" button triggers full profiles search (`search_global` RPC, excludes already-shown IDs); 2-char threshold, 300ms debounce, browser Supabase client; placeholder "Имя или @никнейм"; matches username / name / surname / transliteration in both directions (Latin query → `transliterate_ru(p.name/surname)`; Cyrillic query → `transliterate_ru(lower(p_prefix))` vs Latin fields); global results in separate card under "Другие пользователи"; search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />`: card with 🎁 emoji, "Скопировать" + "Поделиться" pill buttons, invite URL pre-generated on mount, formatted message with sender's first name
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
 - My Wishlists section (Home): `.grouped-card`, title + item count below, numeric count before `›`, full-width dividers
 - Я подарю section (Home): `.grouped-card`, gift title line 1, `Для {ownerName}` line 2, `›`, full-width dividers
@@ -63,6 +63,16 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 ---
 
 ## Current focus
+
+Session 2026-06-06. All changes deployed to production on `main`.
+
+Friend search overhaul (2026-06-06):
+- Two-mode search: default = 2nd + 3rd-degree social graph only (`search_social_graph` RPC, CTE-based friendship walk, SECURITY DEFINER STABLE, LIMIT 15); "Искать дальше" triggers full profiles scan (`search_global` RPC, SECURITY DEFINER STABLE, LIMIT 20, excludes already-shown IDs via `p_exclude_ids uuid[]`)
+- Match fields: username, name, surname — bidirectional; ranking: degree first (2nd before 3rd), then exact username → prefix → name/surname prefix → transliteration → alphabetical
+- Bidirectional transliteration: Latin query → `transliterate_ru(p.name/surname) LIKE lower(p_prefix)||'%'`; Cyrillic query → `p.username/name/surname LIKE transliterate_ru(lower(p_prefix))||'%'` (computed once per call)
+- `transliterate_ru()` rewritten: plpgsql IMMUTABLE, replace()-based (щ→shch, х→kh, ё→e, etc.); replaces broken translate()-based implementation (fix 1: off-by-one; fix 2: complete rewrite; fix 3: query transliteration)
+- Placeholder updated: `@никнейм` → `Имя или @никнейм`; extended mode + results reset on every query change
+- `20260604000000`, `20260605000000–002` marked as applied via `supabase migration repair --linked`; `20260606000000–003` applied via `supabase db push`
 
 Session 2026-06-05 (continued, part 2). All changes deployed to production on `main`.
 
@@ -179,7 +189,7 @@ Remaining work:
 2. Update `app/layout.tsx` metadata: `title: "Create Next App"` → "SimpleWish"
 3. Visual pass — friend detail page
 4. `<h1>Лента</h1>` uses `text-xl font-semibold` instead of `.section-title` — deferred
-5. Migrations `20260605000000`, `20260605000001`, `20260605000002` — must be applied manually in Supabase SQL editor (Docker not available for CLI migration run)
+5. ~~Migrations applied manually~~ — resolved: all migrations now CLI-tracked via `migration repair --linked`
 
 ---
 
@@ -200,10 +210,14 @@ Remaining work:
 | 20260602000001 | Applied | Restore `is_username_available` RPC |
 | 20260603000000 | Applied | Wishlist-level visibility (`visibility` column, `wishlist_access` table, `can_friend_see_wishlist()`, updated RLS on wishlists/items/reservations) |
 | 20260603000001 | Applied | `wishlist_access.created_at` (NULLable, existing rows stay NULL) + `wishlist_access_self_select` policy |
-| 20260604000000 | Applied to DB manually (not CLI-tracked) | `wishlist_access.seen_at` column + backfill existing rows as seen + `mark_wishlist_access_seen` SECURITY DEFINER RPC |
-| 20260605000000 | Apply manually | `leave_wishlist_access(p_wishlist_id uuid)` SECURITY DEFINER RPC — invited user self-removes from wishlist_access |
-| 20260605000001 | Apply manually | `remove_friend(p_friend_id uuid)` SECURITY DEFINER RPC — deletes both friendship rows |
-| 20260605000002 | Apply manually | `CREATE OR REPLACE remove_friend` — adds wishlist_access cleanup in both directions before deleting friendship rows |
+| 20260604000000 | Applied | `wishlist_access.seen_at` column + backfill existing rows as seen + `mark_wishlist_access_seen` SECURITY DEFINER RPC |
+| 20260605000000 | Applied | `leave_wishlist_access(p_wishlist_id uuid)` SECURITY DEFINER RPC — invited user self-removes from wishlist_access |
+| 20260605000001 | Applied | `remove_friend(p_friend_id uuid)` SECURITY DEFINER RPC — deletes both friendship rows |
+| 20260605000002 | Applied | `CREATE OR REPLACE remove_friend` — adds wishlist_access cleanup in both directions before deleting friendship rows |
+| 20260606000000 | Applied | `search_social_graph` + `search_global` RPCs — social-graph-aware two-mode friend search |
+| 20260606000001 | Applied | Fix `transliterate_ru` off-by-one in translate() TO string |
+| 20260606000002 | Applied | Rewrite `transliterate_ru` as plpgsql IMMUTABLE with replace()-based multi-char output |
+| 20260606000003 | Applied | Add Cyrillic-query → Latin-field matching to both search RPCs (query transliteration) |
 
 ---
 
@@ -229,7 +243,7 @@ Remaining work:
 - **Item count pattern:** Separate query `select('wishlist_id').in(...)` → `Map<string, number>`. Duplicated across pages; refactor deferred.
 - **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`. Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
 - **Divider system (three CSS classes):** `.grouped-card-divider` — feed rows, 90% centered, `var(--divider)`. `.row-divider` — full-width entity rows (friends list, search results, wishlists/"Я подарю"), `var(--divider)`. `.item-divider` — wish rows inside wishlist detail grouped-card, 90% centered, static `#e5e7eb` light / `#3a3a3c` dark (not CSS-var to preserve distinct visual weight from feed dividers).
-- **Friend search architecture:** `SearchSection` client component uses `getSupabaseBrowserClient()` for live RPC. Mutations via server actions + `revalidatePath('/friends')`. State classification derived from server props; updated optimistically.
+- **Friend search architecture:** `SearchSection` client component uses `getSupabaseBrowserClient()` for live RPC calls. Mutations via server actions + `revalidatePath('/friends')`. State classification derived from server props; updated optimistically. Two search modes: (1) default — `search_social_graph(p_prefix)` walks the friendship graph (2nd + 3rd degree, CTE-based, SECURITY DEFINER STABLE, LIMIT 15), called automatically after 300ms debounce; (2) extended — `search_global(p_prefix, p_exclude_ids uuid[])` scans all profiles, called only after user taps "Искать дальше" (LIMIT 20). Extended mode and results reset on every query change. Both RPCs match username, name, surname in both directions: `transliterate_ru(p.name/surname) LIKE lower(p_prefix)||'%'` (Latin query → Cyrillic field) and `p.username/name/surname LIKE transliterate_ru(lower(p_prefix))||'%'` (Cyrillic query → Latin field). Transliterated query computed once per call as CTE / inline subquery. `transliterate_ru()` is plpgsql IMMUTABLE, replace()-based.
 - **Search status derivation:** `effectiveStatus = query.length < 2 ? 'idle' : status` — derived in render, avoids `react-hooks/set-state-in-effect` lint error.
 - **`friendships` RLS:** `USING (user_id = auth.uid())` — only current user's rows returned.
 - **`accept_invite` gap:** does not clean up `friend_requests` when users connect via invite link. Cleanup SQL: `DELETE FROM friend_requests fr WHERE EXISTS (SELECT 1 FROM friendships f WHERE f.user_id = fr.from_user_id AND f.friend_id = fr.to_user_id)`.

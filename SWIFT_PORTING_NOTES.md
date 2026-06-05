@@ -62,6 +62,16 @@ Platform-specific pitfalls, native UX invariants, cross-platform behavior requir
 
 ---
 
+## Friend Search
+
+- Default search is limited to the user's **social graph** (2nd and 3rd-degree connections only). The full user database is **not** searched by default. This is a deliberate privacy decision — new users with few friends should not inadvertently expose the full user directory.
+- "Искать дальше" is an **explicit user action** that triggers global search. On iOS this must be a clearly visible secondary button that appears only after the social graph search completes — not an automatic fallback, not triggered on timeout.
+- Global search must exclude users already shown in social graph results. Do not show duplicates.
+- Search is bidirectional: typing Cyrillic finds users with Latin usernames/names (e.g. "Вит" → "Vitalii"), and typing Latin finds users with Cyrillic names (e.g. "ir" → "Ирина"). Implement `transliterate_ru` equivalent in Swift for the query side.
+- Extended search state (global results, "Другие пользователи" label) must reset whenever the query changes — even if the user is mid-scroll.
+
+---
+
 ## Activity Feed
 
 - The current web feed has no historical event log — everything is computed live from existing rows. Deleted rows leave no trace.
