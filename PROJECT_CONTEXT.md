@@ -62,7 +62,28 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
-Session 2026-06-05 complete. All changes deployed to production on `main` (commit `67ab839`).
+Session 2026-06-05 (continued). All changes deployed to production on `main` (commit `2aed9bc`).
+
+Leave invited wishlist (2026-06-05):
+- Invited (non-owner) user can leave a `selected_friends` wishlist via "Покинуть вишлист" button at bottom of wishlist detail page
+- Button only shown when `!isOwner && wishlist.visibility === 'selected_friends'`
+- Uses `leave_wishlist_access(p_wishlist_id uuid)` SECURITY DEFINER RPC — deletes caller's own `wishlist_access` row; guards `auth.uid() IS NOT NULL`
+- `leaveWishlistAction` in `features/wishlists/actions.ts` — checks RPC error (returns early on failure), then `revalidatePath('/wishlists')` + `redirect('/wishlists')`
+- Migration `20260605000000_leave_wishlist_access.sql` — apply manually + `NOTIFY pgrst, 'reload schema';`
+- Same visual pattern as "Архивировать": `mt-6 border-t border-gray-100 pt-4`, `text-sm text-gray-400`
+
+Friend removal (2026-06-05):
+- "Удалить из друзей" button at bottom of `/friends/[friendId]` — red text (`text-red-500`), collapses to inline confirmation on tap
+- Confirmation: "Удалить друга?" heading + description + "Отмена" (gray) / "Удалить" (red) buttons
+- `RemoveFriendSection` client component (`features/friends/remove-friend-section.tsx`) — `useTransition` for pending state; error display if RPC fails
+- `removeFriendAction` in `features/friends/actions.ts` — calls `remove_friend` RPC; on success: `revalidatePath('/friends')`, `revalidatePath('/home')`, `redirect('/friends')`
+- `remove_friend(p_friend_id uuid)` SECURITY DEFINER RPC — deletes all `wishlist_access` rows between the two users in both directions BEFORE deleting both `friendships` rows; atomic in one transaction
+- Migration `20260605000001_remove_friend.sql` — initial RPC (apply manually)
+- Migration `20260605000002_remove_friend_cleanup_access.sql` — `CREATE OR REPLACE` adds wishlist_access cleanup (apply manually + `NOTIFY pgrst`)
+- After removal: profile RLS (`is_friend()`) immediately blocks access to each other's profile → `/friends/[friendId]` returns 404 for removed friend; redirect handles this
+- Orphaned `wishlist_access` rows fully resolved: removal now cleans them up. Re-friending does NOT restore old private wishlist access — owner must explicitly re-share
+
+Previous session: Session 2026-06-05 complete. All changes deployed to production on `main` (commit `67ab839`).
 
 Feed privacy fix (2026-06-05):
 - All private/selected_friends wishlist activity removed from Home feed
@@ -126,6 +147,7 @@ Remaining work:
 2. Update `app/layout.tsx` metadata: `title: "Create Next App"` → "SimpleWish"
 3. Visual pass — friend detail page
 4. `<h1>Лента</h1>` uses `text-xl font-semibold` instead of `.section-title` — deferred
+5. Migrations `20260605000000`, `20260605000001`, `20260605000002` — must be applied manually in Supabase SQL editor (Docker not available for CLI migration run)
 
 ---
 
@@ -147,6 +169,9 @@ Remaining work:
 | 20260603000000 | Applied | Wishlist-level visibility (`visibility` column, `wishlist_access` table, `can_friend_see_wishlist()`, updated RLS on wishlists/items/reservations) |
 | 20260603000001 | Applied | `wishlist_access.created_at` (NULLable, existing rows stay NULL) + `wishlist_access_self_select` policy |
 | 20260604000000 | Applied to DB manually (not CLI-tracked) | `wishlist_access.seen_at` column + backfill existing rows as seen + `mark_wishlist_access_seen` SECURITY DEFINER RPC |
+| 20260605000000 | Apply manually | `leave_wishlist_access(p_wishlist_id uuid)` SECURITY DEFINER RPC — invited user self-removes from wishlist_access |
+| 20260605000001 | Apply manually | `remove_friend(p_friend_id uuid)` SECURITY DEFINER RPC — deletes both friendship rows |
+| 20260605000002 | Apply manually | `CREATE OR REPLACE remove_friend` — adds wishlist_access cleanup in both directions before deleting friendship rows |
 
 ---
 
@@ -194,6 +219,11 @@ Remaining work:
 - **"Вишлисты по приглашению" query:** queries `wishlists` directly with `visibility = selected_friends AND NOT is_archived AND owner_id != me`. RLS (`can_friend_see_wishlist`) acts as the access gate — no need to query `wishlist_access` directly for this view. Owner profiles fetched separately via `profiles.select('id, name, surname').in('id', ownerIds)` (NOT via `profiles!inner` on sharedResult — the embedded join caused the section to disappear silently due to a PostgREST/RLS interaction).
 - **Invited wishlist unread dot:** `wishlist_access.seen_at IS NULL` = unseen. Layout fetches count, passes `hasUnreadInvitedWishlists` to `BottomNav`. Card dot from `unseenAccessResult` in `Promise.all` on wishlists page. `MarkWishlistSeenEffect` client component fires `markWishlistSeenAction` (Server Action) in `useEffect` — required because `revalidatePath` cannot be called during Server Component render. Nav dot clears after `revalidatePath('/wishlists')` causes layout re-render on return to `/wishlists`.
 - **`mark_wishlist_access_seen` RPC:** SECURITY DEFINER, no UPDATE RLS policy. WHERE clause: `wishlist_id = p_wishlist_id AND user_id = auth.uid() AND seen_at IS NULL AND auth.uid() IS NOT NULL`. After applying via SQL editor, run `NOTIFY pgrst, 'reload schema';`.
+- **Friend removal model:** `remove_friend(p_friend_id uuid)` SECURITY DEFINER RPC deletes (1) all `wishlist_access` rows between the two users in both directions, then (2) both `friendships` rows — in one atomic transaction. No direct DELETE RLS exists on `friendships`; all mutations go through this RPC. After removal, `is_friend()` returns false immediately, blocking profile/wishlist/item/reservation access via RLS.
+- **Re-friending does not restore old wishlist_access:** `remove_friend` fully cleans up `wishlist_access` rows. `accept_friend_request`/`accept_invite` only insert `friendships` rows. Owner must explicitly re-share any `selected_friends` wishlist after re-friending.
+- **`leave_wishlist_access` RPC:** SECURITY DEFINER, no DELETE RLS for invited users. WHERE clause: `wishlist_id = p_wishlist_id AND user_id = auth.uid()`. Guard: `auth.uid() IS NOT NULL`. After leaving, RLS via `can_friend_see_wishlist()` immediately blocks access.
+- **`leaveWishlistAction` error handling:** destructures `{ error }` from `supabase.rpc()`; returns early on error (user stays on page); `redirect('/wishlists')` only fires on success.
+- **Friend removal UX placement:** only on `/friends/[friendId]` detail page — not on the friends list page. Reduces accidental removal risk.
 - **Feed privacy rule:** only `visibility = 'all_friends'` wishlists may generate activity events. `new_wishlist` filtered at DB level. `new_items` and `wishlist_item_reserved` filtered in JS after fetching `visibility` in nested select. `wishlist_access_granted` removed from feed entirely.
 - **`revalidatePath` in Server Actions vs Server Components:** `revalidatePath` is only valid in Server Actions triggered by Client Components or Route Handlers — NOT during Server Component render (crashes with "used during render" error in Safari). The friends dot pattern (Client Component → Server Action → `revalidatePath`) is the correct model for invalidating the layout.
 - **Wishlist item visibility toggle:** moved from left-column circle button to inline text button ("Спрятать" gray-500 / "Показать" blue-500) always visible in the row, right of title, left of ⋯. Hidden when edit form is expanded or in delete-confirmation state.
