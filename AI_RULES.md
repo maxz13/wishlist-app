@@ -129,6 +129,20 @@ Claude must not:
 
 ---
 
+# Profile Settings UX Rules
+
+Profile settings follow the inline-edit pattern (same philosophy as wishlist title editing):
+
+- Each row is a tappable button showing `label | value` (label left, value right).
+- Tapping a row switches it to an inline `<input>` (no separate edit screen, no modal).
+- Save triggers on: blur (user tapped away) or Enter key.
+- Cancel triggers on: Escape key (restores original value, no server call).
+- No Save button — ever. Updates are fire-and-forget with optimistic revert on error.
+- Canonical stored state (`storedName`, `storedSurname`, `storedBirthdayIso`) is updated optimistically; reverted if the server action returns an error.
+- Birthday field uses manual text entry with DD.MM.YYYY auto-masking. Do NOT use `<input type="date">` or any native date picker — preserves consistent UX across iOS/Android/desktop and avoids locale-dependent picker formats.
+
+---
+
 # Database Rules
 
 Claude must be careful with database changes.

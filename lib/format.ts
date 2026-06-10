@@ -16,11 +16,17 @@ export function getDaysUntilBirthday(birthdayIso: string, today: Date): number {
   return Math.round((target.getTime() - todayMidnight.getTime()) / 86_400_000)
 }
 
+const MONTHS_RU = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
+
+export function formatBirthdayLong(isoDate: string): string {
+  const [year, month, day] = isoDate.slice(0, 10).split('-').map(Number)
+  return `${day} ${MONTHS_RU[month - 1]} ${year}`
+}
+
 export function friendBirthdayLine(birthdayIso: string, today: Date): string {
   const daysUntil = getDaysUntilBirthday(birthdayIso, today)
   if (daysUntil === 0) return 'День рождения сегодня'
   if (daysUntil <= 10) return `День рождения через ${daysUntil} ${pluralRu(daysUntil, 'день', 'дня', 'дней')}`
   const [, month, day] = birthdayIso.split('-').map(Number)
-  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря']
-  return `День рождения ${day} ${months[month - 1]}`
+  return `День рождения ${day} ${MONTHS_RU[month - 1]}`
 }

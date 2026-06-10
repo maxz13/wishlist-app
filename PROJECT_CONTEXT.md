@@ -37,11 +37,11 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
 - My Wishlists section (Home): `.grouped-card`, title + item count below, numeric count before `›`, full-width dividers
 - Я подарю section (Home): `.grouped-card`, gift title line 1, `Для {ownerName}` line 2, `›`, full-width dividers
-- Profile page: avatar upload with client-side Canvas compression (max 6 MB input, resized to max 768×768, JPEG 0.85 quality, MIME validation); avatar removal ("Удалить фото" — deletes from storage + sets avatar_url null, ignores not-found errors); fields (name, surname, birthday, email) in `grouped-card` with transparent inputs; `h-32 w-32` avatar with `text-4xl` initials fallback; username section removed from profile view (username is immutable — read-only display was removed); avatar actions redesigned as single horizontal compact row ("Изменить фото" + "Удалить фото" pill buttons side-by-side, not stacked); logout button placed below the Save button (not in header).
+- Profile page: compact settings-style layout — no `<form>` wrapper, no Save button. Personal data in `grouped-card` with three rows: **Имя** (label left / full name right; tap → inline `<input>`, Enter/blur saves, Escape cancels, optimistic revert on error; requires both name and surname), **День рождения** (displays as "9 февраля 1985" via `formatBirthdayLong`; tap → masked numeric input DD.MM.YYYY auto-formatting, validates real dates, blank input clears birthday), **Email** (static, with "next version" note). Logout is a `grouped-card` settings row (red text), not a standalone button. Inline-edit follows the same philosophy as wishlist title editing (`storedName`/`storedSurname`/`storedBirthdayIso` canonical state, optimistic update, revert on server error, `useTransition`). Avatar section unchanged (Canvas compression, max 768×768 JPEG 0.85, MIME validation, `h-32 w-32`). Privacy section (friends_list_visibility expand/collapse radio). Security section (password change). Account deletion placeholder.
 - Password change: "Безопасность" section, collapsed by default, current-password re-auth, show/hide toggles, min 8 chars
 - Registration polish: birthday field auto-formats as `DD.MM.YYYY` on each keystroke (no manual separators needed); password field has a show/hide visibility toggle; iOS Keychain autocomplete attributes set on all auth fields
 - Account deletion placeholder: "Появится в следующей версии"
-- App header (`app/(app)/layout.tsx`): avatar `h-16 w-16`, full name on one line, `@username` second line in `text-gray-400`; no bottom border; shown on all app pages. No logout in header — logout was moved to the Profile page (below the Save button)
+- App header (`app/(app)/layout.tsx`): avatar `h-16 w-16`, full name on one line, `@username` second line in `text-gray-400`; no bottom border; shown on all app pages. No logout in header — logout is in the Profile page as a `grouped-card` settings row (red text)
 - Username system: auto-generated at registration from name+surname transliteration, editable before submit, immutable after creation, shown in profile (read-only) and header
 - Wishlist archiving: archive/restore from detail page (bottom of page); invisible to friends; muted "Архив" section at bottom of wishlists page in its own `grouped-card`
 - Wishlists page (`/wishlists`): `section-title` h1; active wishlists in `grouped-card` with item counts; visibility indicators on cards; "Доступные вам" section for private wishlists shared with the user via selected_friends access; archive in separate `grouped-card` with muted styling
@@ -65,6 +65,26 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 ---
 
 ## Current focus
+
+Session 2026-06-10. Profile compact redesign + friends list privacy deployed to production on `main`.
+
+Profile compact redesign (2026-06-10):
+- Personal data section replaced with compact settings rows (label | value horizontal layout)
+- Name + surname merged into a single "Имя" row (inline-edit: tap → full name input, split on save)
+- Birthday inline-edit with DD.MM.YYYY auto-masking; displays as "9 февраля 1985" (`formatBirthdayLong`)
+- Save button removed — each row saves on blur/Enter, cancels on Escape, reverts optimistically on error
+- Logout converted from full-width standalone button to `grouped-card` settings row (red text)
+- `lib/format.ts`: added `MONTHS_RU` constant + `formatBirthdayLong(isoDate)`
+
+Friends list privacy (same deploy, earlier in session):
+- `profiles.friends_list_visibility text NOT NULL DEFAULT 'friends'` column (migration `20260610000001`)
+- `get_mutual_friends(p_friend_id uuid)` + `get_friends_of_friend(p_friend_id uuid)` SECURITY DEFINER RPCs
+- `/friends/[friendId]` page rewritten: friendship guard, mutual friends section (navigable, no action buttons), "Другие друзья / Друзья {Name}" interactive section (`FriendPeopleSection` client component)
+- Privacy toggle on Profile page: "Приватность" section, expand/collapse `●/○` radio pattern, `updateFriendsListVisibilityAction`
+- `get_mutual_friend_counts(p_user_ids uuid[])` RPC added to Home and Friends pages (Round 2 parallel)
+- Birthday always rendered as a separate third line (not appended to metadata line)
+
+---
 
 Session 2026-06-06. All changes deployed to production on `main` (commit `68f4560`).
 
@@ -245,7 +265,7 @@ Remaining work:
 - **`wishlist_access_granted` feed event:** REMOVED from feed (2026-06-05). All `wishlist_access` entries are `selected_friends` by definition — showing them in the feed leaks private wishlist names.
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.
 - **Item count pattern:** Separate query `select('wishlist_id').in(...)` → `Map<string, number>`. Duplicated across pages; refactor deferred.
-- **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`. Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
+- **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`, `formatBirthdayLong` (ISO date → "9 февраля 1985"; used in profile display). Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
 - **Divider system (three CSS classes):** `.grouped-card-divider` — feed rows, 90% centered, `var(--divider)`. `.row-divider` — full-width entity rows (friends list, search results, wishlists/"Я подарю"), `var(--divider)`. `.item-divider` — wish rows inside wishlist detail grouped-card, 90% centered, static `#e5e7eb` light / `#3a3a3c` dark (not CSS-var to preserve distinct visual weight from feed dividers).
 - **Friend search architecture:** `SearchSection` client component uses `getSupabaseBrowserClient()` for live RPC calls. Mutations via server actions + `revalidatePath('/friends')`. State classification derived from server props; updated optimistically. Two search modes: (1) default — `search_social_graph(p_prefix)` walks the friendship graph (2nd + 3rd degree, CTE-based, SECURITY DEFINER STABLE, LIMIT 15), called automatically after 300ms debounce; (2) extended — `search_global(p_prefix, p_exclude_ids uuid[])` scans all profiles, called only after user taps "Искать дальше" (LIMIT 20). Extended mode and results reset on every query change. Both RPCs match username, name, surname in both directions: `transliterate_ru(p.name/surname) LIKE lower(p_prefix)||'%'` (Latin query → Cyrillic field) and `p.username/name/surname LIKE transliterate_ru(lower(p_prefix))||'%'` (Cyrillic query → Latin field). Transliterated query computed once per call as CTE / inline subquery. `transliterate_ru()` is plpgsql IMMUTABLE, replace()-based.
 - **Search status derivation:** `effectiveStatus = query.length < 2 ? 'idle' : status` — derived in render, avoids `react-hooks/set-state-in-effect` lint error.

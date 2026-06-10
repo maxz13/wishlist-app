@@ -3,8 +3,9 @@
 import { useRef, useState, useTransition } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { logoutAction } from '@/features/auth/actions'
-import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction } from './actions'
-import type { UpdateProfileState, ChangePasswordState } from './actions'
+import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction, updateFriendsListVisibilityAction } from './actions'
+import type { ChangePasswordState } from './actions'
+import { formatBirthdayLong } from '@/lib/format'
 
 function EyeIcon() {
   return (
@@ -32,6 +33,7 @@ type ProfileData = {
   avatar_url: string | null
   birthday: string | null
   username: string
+  friends_list_visibility: 'friends' | 'private'
 }
 
 type Props = {
@@ -68,17 +70,26 @@ function compressImage(file: File, maxDim: number, quality: number): Promise<Blo
 }
 
 export function ProfileForm({ profile }: Props) {
-  const [name, setName] = useState(profile.name)
-  const [surname, setSurname] = useState(profile.surname)
-  // Supabase returns `date` as "YYYY-MM-DD"; strip any unexpected timezone suffix
-  // so input type="date" always receives a valid date value or empty string.
-  const [birthday, setBirthday] = useState(
-    // Convert stored YYYY-MM-DD → DD.MM.YYYY for display
-    profile.birthday ? profile.birthday.slice(0, 10).split('-').reverse().join('.') : ''
+  // Canonical stored values — updated optimistically after each inline save
+  const [storedName, setStoredName] = useState(profile.name)
+  const [storedSurname, setStoredSurname] = useState(profile.surname)
+  const [storedBirthdayIso, setStoredBirthdayIso] = useState<string | null>(
+    profile.birthday ? profile.birthday.slice(0, 10) : null
   )
-  const [formState, setFormState] = useState<UpdateProfileState>(undefined)
-  const [pending, startTransition] = useTransition()
 
+  // Inline edit — name
+  const [nameEditing, setNameEditing] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  const [nameError, setNameError] = useState<string | null>(null)
+
+  // Inline edit — birthday
+  const [birthdayEditing, setBirthdayEditing] = useState(false)
+  const [birthdayValue, setBirthdayValue] = useState('')
+  const [birthdayError, setBirthdayError] = useState<string | null>(null)
+
+  const [, startTransition] = useTransition()
+
+  // Avatar
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile.avatar_url)
   const [avatarLoading, setAvatarLoading] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
@@ -95,23 +106,150 @@ export function ProfileForm({ profile }: Props) {
   const [passwordState, setPasswordState] = useState<ChangePasswordState>(undefined)
   const [passwordPending, startPasswordTransition] = useTransition()
 
-  const initials = (
-    (profile.name[0] ?? '') + (profile.surname[0] ?? '')
-  ).toUpperCase()
+  // Privacy — friends list visibility
+  const [visibility, setVisibility] = useState<'friends' | 'private'>(profile.friends_list_visibility)
+  const [visibilityOpen, setVisibilityOpen] = useState(false)
+  const [visibilityError, setVisibilityError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setFormState(undefined)
+  const displayName = `${storedName} ${storedSurname}`
+  const displayBirthday = storedBirthdayIso ? formatBirthdayLong(storedBirthdayIso) : null
+  const initials = ((storedName[0] ?? '') + (storedSurname[0] ?? '')).toUpperCase()
+
+  // ── Name ──────────────────────────────────────────────────────────────────
+
+  function enterNameEdit() {
+    setNameValue(displayName)
+    setNameError(null)
+    setNameEditing(true)
+  }
+
+  function saveName() {
+    const trimmed = nameValue.trim()
+    if (!trimmed || trimmed === displayName) {
+      setNameEditing(false)
+      return
+    }
+    const parts = trimmed.split(/\s+/)
+    if (parts.length < 2) {
+      setNameEditing(false)
+      setNameError('Введите имя и фамилию')
+      return
+    }
+    const newName = parts[0]
+    const newSurname = parts.slice(1).join(' ')
+    const prevName = storedName
+    const prevSurname = storedSurname
+    setStoredName(newName)
+    setStoredSurname(newSurname)
+    setNameEditing(false)
+    setNameError(null)
     const fd = new FormData()
-    fd.set('name', name)
-    fd.set('surname', surname)
-    // Convert DD.MM.YYYY → YYYY-MM-DD before sending to server
-    fd.set('birthday', birthday ? birthday.split('.').reverse().join('-') : '')
+    fd.set('name', newName)
+    fd.set('surname', newSurname)
+    fd.set('birthday', storedBirthdayIso ?? '')
     startTransition(async () => {
       const result = await updateProfileAction(undefined, fd)
-      setFormState(result)
+      if (result?.errors || result?.message) {
+        setStoredName(prevName)
+        setStoredSurname(prevSurname)
+        setNameError(
+          result?.errors?.name?.[0] ??
+          result?.errors?.surname?.[0] ??
+          result?.message ??
+          'Не удалось сохранить'
+        )
+      }
     })
   }
+
+  function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); saveName() }
+    else if (e.key === 'Escape') { setNameEditing(false); setNameError(null) }
+  }
+
+  // ── Birthday ──────────────────────────────────────────────────────────────
+
+  function enterBirthdayEdit() {
+    const display = storedBirthdayIso
+      ? storedBirthdayIso.slice(0, 10).split('-').reverse().join('.')
+      : ''
+    setBirthdayValue(display)
+    setBirthdayError(null)
+    setBirthdayEditing(true)
+  }
+
+  function saveBirthday() {
+    const trimmed = birthdayValue.trim()
+
+    if (!trimmed) {
+      if (!storedBirthdayIso) { setBirthdayEditing(false); return }
+      const prevIso = storedBirthdayIso
+      setStoredBirthdayIso(null)
+      setBirthdayEditing(false)
+      setBirthdayError(null)
+      const fd = new FormData()
+      fd.set('name', storedName)
+      fd.set('surname', storedSurname)
+      fd.set('birthday', '')
+      startTransition(async () => {
+        const result = await updateProfileAction(undefined, fd)
+        if (result?.errors || result?.message) {
+          setStoredBirthdayIso(prevIso)
+          setBirthdayError(result?.message ?? 'Не удалось сохранить')
+        }
+      })
+      return
+    }
+
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(trimmed)) {
+      setBirthdayEditing(false)
+      setBirthdayError('Неверный формат даты')
+      return
+    }
+
+    const [dd, mm, yyyy] = trimmed.split('.').map(Number)
+    const date = new Date(yyyy, mm - 1, dd)
+    if (date.getFullYear() !== yyyy || date.getMonth() !== mm - 1 || date.getDate() !== dd) {
+      setBirthdayEditing(false)
+      setBirthdayError('Неверный формат даты')
+      return
+    }
+
+    const newIso = `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+    if (newIso === storedBirthdayIso) { setBirthdayEditing(false); return }
+
+    const prevIso = storedBirthdayIso
+    setStoredBirthdayIso(newIso)
+    setBirthdayEditing(false)
+    setBirthdayError(null)
+
+    const fd = new FormData()
+    fd.set('name', storedName)
+    fd.set('surname', storedSurname)
+    fd.set('birthday', newIso)
+    startTransition(async () => {
+      const result = await updateProfileAction(undefined, fd)
+      if (result?.errors || result?.message) {
+        setStoredBirthdayIso(prevIso)
+        setBirthdayError(result?.message ?? 'Не удалось сохранить')
+      }
+    })
+  }
+
+  function handleBirthdayChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 8)
+    let formatted = digits
+    if (digits.length > 2) formatted = digits.slice(0, 2) + '.' + digits.slice(2)
+    if (digits.length > 4) formatted = formatted.slice(0, 5) + '.' + formatted.slice(5)
+    setBirthdayValue(formatted)
+  }
+
+  function handleBirthdayKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); saveBirthday() }
+    else if (e.key === 'Escape') { setBirthdayEditing(false); setBirthdayError(null) }
+  }
+
+  // ── Avatar ────────────────────────────────────────────────────────────────
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -146,7 +284,6 @@ export function ProfileForm({ profile }: Props) {
         data: { publicUrl },
       } = supabase.storage.from('avatars').getPublicUrl(path)
 
-      // Cache-bust so the browser fetches the new file immediately
       const urlWithBust = `${publicUrl}?v=${Date.now()}`
 
       const result = await updateAvatarUrlAction(urlWithBust)
@@ -173,6 +310,8 @@ export function ProfileForm({ profile }: Props) {
       setAvatarLoading(false)
     }
   }
+
+  // ── Password ──────────────────────────────────────────────────────────────
 
   function handlePasswordSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -204,6 +343,20 @@ export function ProfileForm({ profile }: Props) {
     setShowCurrent(false)
     setShowNew(false)
     setShowConfirm(false)
+  }
+
+  // ── Visibility ────────────────────────────────────────────────────────────
+
+  async function handleVisibilitySelect(value: 'friends' | 'private') {
+    const prev = visibility
+    setVisibility(value)
+    setVisibilityOpen(false)
+    setVisibilityError(null)
+    const result = await updateFriendsListVisibilityAction(value)
+    if (result?.error) {
+      setVisibility(prev)
+      setVisibilityError(result.error)
+    }
   }
 
   return (
@@ -280,97 +433,145 @@ export function ProfileForm({ profile }: Props) {
         />
       </section>
 
-      {/* ── Edit form ── */}
+      {/* ── Personal data ── */}
       <section>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="grouped-card">
 
-          <div className="grouped-card">
-
-            <div className="px-4 py-2.5">
-              <label className="text-xs font-medium text-gray-500">Имя</label>
-              <input
-                name="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-              />
-              {formState?.errors?.name && (
-                <p className="mt-1 text-xs text-red-600">{formState.errors.name[0]}</p>
-              )}
+          {/* Name row */}
+          {nameEditing ? (
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-4">
+                <span className="shrink-0 text-sm text-gray-500">Имя</span>
+                <input
+                  autoFocus
+                  type="text"
+                  value={nameValue}
+                  onChange={e => setNameValue(e.target.value)}
+                  onBlur={saveName}
+                  onKeyDown={handleNameKeyDown}
+                  className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
+                />
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={enterNameEdit}
+              className="flex w-full items-center justify-between px-4 py-3"
+            >
+              <span className="shrink-0 text-sm text-gray-500">Имя</span>
+              <span className="min-w-0 truncate pl-4 text-right text-sm text-gray-900 dark:text-gray-100">{displayName}</span>
+            </button>
+          )}
+          {nameError && (
+            <p className="px-4 pb-2 text-right text-xs text-red-600">{nameError}</p>
+          )}
 
-            <div className="row-divider" />
+          <div className="row-divider" />
 
-            <div className="px-4 py-2.5">
-              <label className="text-xs font-medium text-gray-500">Фамилия</label>
-              <input
-                name="surname"
-                type="text"
-                value={surname}
-                onChange={(e) => setSurname(e.target.value)}
-                required
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-              />
-              {formState?.errors?.surname && (
-                <p className="mt-1 text-xs text-red-600">{formState.errors.surname[0]}</p>
-              )}
+          {/* Birthday row */}
+          {birthdayEditing ? (
+            <div className="px-4 py-3">
+              <div className="flex items-center gap-4">
+                <span className="shrink-0 text-sm text-gray-500">День рождения</span>
+                <input
+                  autoFocus
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="ДД.ММ.ГГГГ"
+                  value={birthdayValue}
+                  onChange={handleBirthdayChange}
+                  onBlur={saveBirthday}
+                  onKeyDown={handleBirthdayKeyDown}
+                  className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
+                />
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={enterBirthdayEdit}
+              className="flex w-full items-center justify-between px-4 py-3"
+            >
+              <span className="shrink-0 text-sm text-gray-500">День рождения</span>
+              <span className={`text-sm ${displayBirthday ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'}`}>
+                {displayBirthday ?? 'Не указан'}
+              </span>
+            </button>
+          )}
+          {birthdayError && (
+            <p className="px-4 pb-2 text-right text-xs text-red-600">{birthdayError}</p>
+          )}
 
-            <div className="row-divider" />
+          <div className="row-divider" />
 
-            <div className="px-4 py-2.5">
-              <label className="text-xs font-medium text-gray-500">День рождения</label>
-              <input
-                name="birthday"
-                type="text"
-                inputMode="numeric"
-                placeholder="ДД.ММ.ГГГГ"
-                value={birthday}
-                onChange={(e) => setBirthday(e.target.value)}
-                className="mt-0.5 w-full bg-transparent text-sm text-gray-900 dark:text-gray-100 focus:outline-none"
-              />
-            </div>
-
-            <div className="row-divider" />
-
-            <div className="px-4 py-2.5">
-              <label className="text-xs font-medium text-gray-500">Email</label>
-              <p className="mt-0.5 text-sm text-gray-900 dark:text-gray-100">{profile.email}</p>
+          {/* Email row (static) */}
+          <div className="flex items-start justify-between gap-4 px-4 py-3">
+            <span className="shrink-0 text-sm text-gray-500">Email</span>
+            <div className="min-w-0 text-right">
+              <p className="truncate text-sm text-gray-900 dark:text-gray-100">{profile.email}</p>
               <p className="mt-0.5 text-xs text-gray-400">Изменение email появится в следующей версии.</p>
             </div>
-
           </div>
 
-          {formState?.message && !formState.success && (
-            <p className="text-sm text-red-600">{formState.message}</p>
-          )}
-          {formState?.success && (
-            <p className="text-sm text-green-600">Профиль обновлён</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full rounded-xl bg-gray-900 dark:bg-white py-3 text-sm font-medium text-white dark:text-gray-900 disabled:opacity-40"
-          >
-            {pending ? 'Сохранение...' : 'Сохранить'}
-          </button>
-
-        </form>
+        </div>
       </section>
 
       {/* ── Logout ── */}
       <section>
-        <form action={logoutAction}>
+        <div className="grouped-card">
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-500 dark:text-red-400"
+            >
+              Выйти из аккаунта
+            </button>
+          </form>
+        </div>
+      </section>
+
+      {/* ── Privacy ── */}
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Приватность</h2>
+        <div className="grouped-card">
           <button
-            type="submit"
-            className="w-full rounded-xl border border-gray-200 dark:border-[#323234] py-3 text-sm font-medium text-red-500 dark:text-red-400"
+            type="button"
+            onClick={() => setVisibilityOpen(v => !v)}
+            className="flex w-full items-center justify-between px-4 py-3"
           >
-            Выйти из аккаунта
+            <span className="text-sm text-gray-900 dark:text-gray-100">Список друзей</span>
+            <span className="flex items-center gap-1 text-sm text-gray-400">
+              {visibility === 'friends' ? 'Видят друзья' : 'Только я'}
+              <span>›</span>
+            </span>
           </button>
-        </form>
+          {visibilityOpen && (
+            <>
+              <div className="row-divider" />
+              {(['friends', 'private'] as const).map((val, i) => (
+                <div key={val}>
+                  {i > 0 && <div className="row-divider" />}
+                  <button
+                    type="button"
+                    onClick={() => handleVisibilitySelect(val)}
+                    className="flex w-full items-center gap-3 px-4 py-3"
+                  >
+                    <span className={`w-3 text-sm ${visibility === val ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'}`}>
+                      {visibility === val ? '●' : '○'}
+                    </span>
+                    <span className="text-sm text-gray-900 dark:text-gray-100">
+                      {val === 'friends' ? 'Видят друзья' : 'Только я'}
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        {visibilityError && (
+          <p className="mt-1 text-xs text-red-600">{visibilityError}</p>
+        )}
       </section>
 
       {/* ── Security ── */}

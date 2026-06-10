@@ -148,6 +148,22 @@ export async function updateAvatarUrlAction(
   return {}
 }
 
+export async function updateFriendsListVisibilityAction(
+  value: 'friends' | 'private'
+): Promise<{ error?: string }> {
+  if (value !== 'friends' && value !== 'private') return { error: 'Недопустимое значение' }
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+  const { error } = await supabase
+    .from('profiles')
+    .update({ friends_list_visibility: value })
+    .eq('id', user.id)
+  if (error) return { error: 'Не удалось сохранить. Попробуйте ещё раз.' }
+  revalidatePath('/profile')
+  return {}
+}
+
 export async function removeAvatarAction(): Promise<{ error?: string }> {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
