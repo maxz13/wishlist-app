@@ -79,6 +79,19 @@ export async function declineFriendRequestAction(requestId: string): Promise<{ e
   return {}
 }
 
+export async function dismissRecommendationAction(dismissedUserId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+  const { error } = await supabase
+    .from('friend_recommendation_dismissals')
+    .insert({ user_id: user.id, dismissed_user_id: dismissedUserId })
+  if (error && error.code !== '23505') return { error: error.message }
+  revalidatePath('/friends')
+  revalidatePath('/home')
+  return {}
+}
+
 export async function removeFriendAction(friendId: string): Promise<{ error?: string }> {
   const supabase = await createServerSupabaseClient()
   const {

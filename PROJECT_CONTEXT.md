@@ -66,6 +66,18 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
+Session 2026-06-10 (Phase 3). Friend recommendations and social discovery deployed to production on `main`.
+
+Friend recommendations (Phase 3, 2026-06-10):
+- `friend_recommendation_dismissals (user_id, dismissed_user_id)` table: composite PK, CASCADE FKs, RLS own-rows
+- `get_friend_recommendations(p_limit int DEFAULT 20)` SECURITY DEFINER STABLE RPC: 2nd-degree FOF graph, excludes existing friends/self/pending outgoing/dismissed; ranks by mutual_count → visible wishlist count → visible item count → username; returns `(id, name, surname, avatar_url, username, mutual_count)`
+- `RecommendationsSection` client component (`features/friends/recommendations-section.tsx`): optimistic `outgoingIds`/`dismissedIds`/`acceptedIds` Sets, `useTransition`; card row: avatar + name/@username/N общих друга + `[ Добавить | Принять | Запрос отправлен ]` + inline red `bg-red-500` X dismiss button (hidden once request sent, accepted removes row entirely)
+- `dismissRecommendationAction` in `features/friends/actions.ts`: silently ignores `23505` unique-violation
+- Home page conditional swap: if recommendations exist → show "Возможно, вы знакомы" (slice 0-3) + "Все рекомендации ›" link to /friends; else → existing Друзья block unchanged
+- Friends page order: IncomingRequests → Search → Invite → Recommendations ("Возможно, вы знакомы", up to 8) → "Мои друзья"
+- Invite card: title/subtitle removed; action text buttons replaced with icon-only Copy/Share2 (lucide-react, `p-2 rounded-lg`)
+- Migration `20260610000002` must be applied manually in SQL editor + `NOTIFY pgrst, 'reload schema';`
+
 Session 2026-06-10. Profile compact redesign + friends list privacy deployed to production on `main`.
 
 Profile compact redesign (2026-06-10):
@@ -240,6 +252,9 @@ Remaining work:
 | 20260606000001 | Applied | Fix `transliterate_ru` off-by-one in translate() TO string |
 | 20260606000002 | Applied | Rewrite `transliterate_ru` as plpgsql IMMUTABLE with replace()-based multi-char output |
 | 20260606000003 | Applied | Add Cyrillic-query → Latin-field matching to both search RPCs (query transliteration) |
+| 20260610000000 | Applied | `get_mutual_friend_counts(p_user_ids uuid[])` batch RPC — returns mutual friend counts for friends list and search results |
+| 20260610000001 | Applied | `profiles.friends_list_visibility` column + `get_mutual_friends` + `get_friends_of_friend` SECURITY DEFINER RPCs |
+| 20260610000002 | Applied | `friend_recommendation_dismissals` table + `get_friend_recommendations(p_limit int)` SECURITY DEFINER RPC |
 
 ---
 
@@ -300,6 +315,10 @@ Remaining work:
 - **`revalidatePath` in Server Actions vs Server Components:** `revalidatePath` is only valid in Server Actions triggered by Client Components or Route Handlers — NOT during Server Component render (crashes with "used during render" error in Safari). The friends dot pattern (Client Component → Server Action → `revalidatePath`) is the correct model for invalidating the layout.
 - **Wishlist item visibility toggle:** moved from left-column circle button to inline text button ("Спрятать" gray-500 / "Показать" blue-500) always visible in the row, right of title, left of ⋯. Hidden when edit form is expanded or in delete-confirmation state.
 - **Wishlist item auto-save dirty check:** `doSave()` in `OwnerItemRow` compares `titleValue` vs `item.title`, `formData.get('price')` vs `item.price !== null ? String(item.price) : ''`, and `formData.get('link')` vs `item.link ?? ''` before calling `updateWishlistItemAction`. If all three match, `onCollapse()` is called directly and the function returns — no action invoked, no DB write, no `revalidatePath`. Applies on both manual outside-clicks and the `requestClose` signal.
+- **Friend recommendations graph:** `get_friend_recommendations` is a SECURITY DEFINER STABLE function that bypasses RLS to traverse all `friendships` rows. It finds 2nd-degree friends-of-friends only (NOT 3rd degree, NOT global fallback). `friends_list_visibility` is intentionally ignored for graph traversal — it is a display-only flag. Rankings: mutual_count DESC → visible_wishlist_count DESC → visible_item_count DESC → username ASC. Wishlist/item counts computed inside the RPC for ranking only, not returned.
+- **`friend_recommendation_dismissals` pattern:** `(user_id, dismissed_user_id)` composite PK prevents duplicate rows. `dismissRecommendationAction` silently ignores PostgreSQL error `23505` (unique_violation) so double-calls are safe. After insert, revalidates `/friends` and `/home` to clear server-side recommendations on next load.
+- **Recommendation dismiss UX:** inline red `bg-red-500` square button to the right of the primary action button (same height, `px-2 py-1.5`); hidden once request is sent (`!isOutgoing` guard). Accepted users disappear entirely from visible list via `acceptedIds` Set.
+- **Home page conditional swap:** if `get_friend_recommendations` returns > 0 rows → render `RecommendationsSection` (slice 0-3) under "Возможно, вы знакомы" heading with "Все рекомендации ›" link to `/friends`; else → render existing Друзья block unchanged. The two branches share no code — no fallback prop threading.
 - **Dark mode approach:** `@media (prefers-color-scheme: dark)` only — no ThemeProvider, no toggle, no `class="dark"`, no localStorage. All primary surface values use CSS custom properties. Tailwind `dark:` utility classes for one-off values. Auth pages intentionally excluded from dark mode styling.
 
 ---

@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { pluralRu, friendBirthdayLine } from '@/lib/format'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
+import { RecommendationsSection } from '@/features/friends/recommendations-section'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
@@ -116,6 +117,7 @@ export default async function HomePage() {
     newItemsResult,
     newReservationsResult,
     accessGrantedResult,
+    recommendationsResult,
   ] = await Promise.all([
     supabase
       .from('friendships')
@@ -155,6 +157,7 @@ export default async function HomePage() {
       .gte('created_at', sevenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(50),
+    supabase.rpc('get_friend_recommendations', { p_limit: 8 }),
   ])
 
   // Derive IDs from Round 1 results
@@ -163,6 +166,17 @@ export default async function HomePage() {
   const rawRequests    = (requestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
   const wishlists      = (wishlistsResult.data ?? []) as Wishlist[]
   const myReservations = (myReservationsResult.data ?? []) as Array<{ id: string; wishlist_item_id: string }>
+
+  type RecommendationRow = {
+    id: string; name: string; surname: string
+    avatar_url: string | null; username: string; mutual_count: number
+  }
+  const recommendations = (recommendationsResult.data ?? []) as RecommendationRow[]
+  // rawRequests is incoming-only (.eq('to_user_id', user.id)), so this map is correct for initialIncomingMap.
+  const recIncomingMap: Record<string, string> = {}
+  for (const r of rawRequests) {
+    recIncomingMap[r.from_user_id] = r.id
+  }
 
   // Round 2: queries that depend on Round 1 IDs — run in parallel
   const [
@@ -552,70 +566,86 @@ export default async function HomePage() {
 
       <div className={`flex flex-col${hasActivity ? ' mt-8 sm:mt-10' : ' mt-4'}`}>
 
-        {/* 1. Друзья */}
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="section-title">Друзья</h2>
-            <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
-              Все друзья<span>›</span>
-            </Link>
-          </div>
-          {hasFriends ? (
-            <>
-              <ul className="grouped-card">
-                {displayedFriends.map((friend, i) => {
-                  const count = friendWishlistCountMap.get(friend.id) ?? 0
-                  const itemCount = friendItemCountMap.get(friend.id) ?? 0
-                  const mutualCount = mutualCountMap.get(friend.id) ?? 0
-                  const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
-                  const parts: string[] = []
-                  if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
-                  if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
-                  if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
-                  const subline = parts.length > 0 ? parts.join(' • ') : null
-                  return (
-                    <li key={friend.id}>
-                      {i > 0 && <div className="row-divider" />}
-                      <Link
-                        href={`/friends/${friend.id}`}
-                        className="flex items-center gap-3 px-4 py-3"
-                      >
-                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                          {friend.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                              {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
-                          {subline && <p className="text-xs text-gray-400">{subline}</p>}
-                          {birthday && <p className="text-xs text-gray-400">{birthday}</p>}
-                        </div>
-                        <span className="shrink-0 text-gray-400">›</span>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-              {moreFriendsCount > 0 && (
-                <Link href="/friends" className="mt-2 block py-1 text-sm text-gray-500">
-                  {moreItemsLabel(moreFriendsCount, 'друг', 'друга', 'друзей')}
-                </Link>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-sm text-gray-500">У вас пока нет друзей</p>
-              <Link href="/friends" className="text-sm text-gray-700 dark:text-gray-300 underline">
-                Пригласить друга
+        {/* 1. Рекомендации или Друзья */}
+        {recommendations.length > 0 ? (
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="section-title">Возможно, вы знакомы</h2>
+              <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
+                Все рекомендации<span>›</span>
               </Link>
             </div>
-          )}
-        </section>
+            <RecommendationsSection
+              recommendations={recommendations.slice(0, 3)}
+              initialOutgoingIds={[]}
+              initialIncomingMap={recIncomingMap}
+            />
+          </section>
+        ) : (
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="section-title">Друзья</h2>
+              <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
+                Все друзья<span>›</span>
+              </Link>
+            </div>
+            {hasFriends ? (
+              <>
+                <ul className="grouped-card">
+                  {displayedFriends.map((friend, i) => {
+                    const count = friendWishlistCountMap.get(friend.id) ?? 0
+                    const itemCount = friendItemCountMap.get(friend.id) ?? 0
+                    const mutualCount = mutualCountMap.get(friend.id) ?? 0
+                    const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
+                    const parts: string[] = []
+                    if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
+                    if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
+                    if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
+                    const subline = parts.length > 0 ? parts.join(' • ') : null
+                    return (
+                      <li key={friend.id}>
+                        {i > 0 && <div className="row-divider" />}
+                        <Link
+                          href={`/friends/${friend.id}`}
+                          className="flex items-center gap-3 px-4 py-3"
+                        >
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                            {friend.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                                {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
+                            {subline && <p className="text-xs text-gray-400">{subline}</p>}
+                            {birthday && <p className="text-xs text-gray-400">{birthday}</p>}
+                          </div>
+                          <span className="shrink-0 text-gray-400">›</span>
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {moreFriendsCount > 0 && (
+                  <Link href="/friends" className="mt-2 block py-1 text-sm text-gray-500">
+                    {moreItemsLabel(moreFriendsCount, 'друг', 'друга', 'друзей')}
+                  </Link>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm text-gray-500">У вас пока нет друзей</p>
+                <Link href="/friends" className="text-sm text-gray-700 dark:text-gray-300 underline">
+                  Пригласить друга
+                </Link>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 2. Мои вишлисты */}
         {hasWishlists && (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useTransition } from 'react'
+import { Copy, Share2 } from 'lucide-react'
 import { createInviteAction } from './actions'
 
 function buildShareText(firstName: string, inviteUrl: string): string {
@@ -98,37 +99,34 @@ export function CreateInviteSection() {
   }
 
   return (
-    <section className="mt-8 pt-6">
-      <h2 className="text-base font-medium">Пригласить друга</h2>
-      <p className="mt-1 text-sm text-gray-500">
-        Поделитесь приглашением — друг сможет добавить вас и видеть ваши списки желаний.
-      </p>
-
-      <div className="grouped-card mt-4 px-4 py-3">
+    <section className="mt-6">
+      <div className="grouped-card px-4 py-3">
         <div className="flex items-center gap-3">
           <span className="text-2xl leading-none">🎁</span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Приглашение в SimpleWish</p>
             <p className="text-xs text-gray-400">Готовый текст со ссылкой</p>
           </div>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            disabled={isLoading || pending}
-            className="rounded-full border border-gray-200 dark:border-[#323234] px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-40"
-          >
-            Скопировать
-          </button>
-          <button
-            type="button"
-            onClick={handleShare}
-            disabled={isLoading || pending}
-            className="rounded-full border border-gray-200 dark:border-[#323234] px-4 py-1.5 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-40"
-          >
-            Поделиться
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={handleCopy}
+              disabled={isLoading || pending}
+              aria-label="Скопировать"
+              className="rounded-lg p-2 text-gray-500 dark:text-gray-400 disabled:opacity-40"
+            >
+              <Copy size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={isLoading || pending}
+              aria-label="Поделиться"
+              className="rounded-lg p-2 text-gray-500 dark:text-gray-400 disabled:opacity-40"
+            >
+              <Share2 size={18} />
+            </button>
+          </div>
         </div>
         {copied && (
           <p className="mt-2 text-xs text-green-700">✓ Приглашение скопировано</p>
