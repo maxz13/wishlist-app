@@ -91,18 +91,25 @@ export default async function FriendsPage() {
     incomingMapForSearch[r.from_user_id] = r.id
   }
 
-  // Active wishlist counts per friend
+  // Wishlist counts, item counts, and mutual friend counts per friend
   const friendWishlistCountMap = new Map<string, number>()
   const friendItemCountMap = new Map<string, number>()
+  const mutualCountMap = new Map<string, number>()
   if (friendIds.length > 0) {
-    const { data: wishlistRows } = await supabase
-      .from('wishlists')
-      .select('id, owner_id')
-      .in('owner_id', friendIds)
-      .eq('is_archived', false)
+    const [{ data: wishlistRows }, { data: mutualRows }] = await Promise.all([
+      supabase
+        .from('wishlists')
+        .select('id, owner_id')
+        .in('owner_id', friendIds)
+        .eq('is_archived', false),
+      supabase.rpc('get_mutual_friend_counts', { p_user_ids: friendIds }),
+    ])
     const rows = (wishlistRows ?? []) as Array<{ id: string; owner_id: string }>
     for (const row of rows) {
       friendWishlistCountMap.set(row.owner_id, (friendWishlistCountMap.get(row.owner_id) ?? 0) + 1)
+    }
+    for (const row of (mutualRows ?? []) as Array<{ user_id: string; mutual_count: number }>) {
+      mutualCountMap.set(row.user_id, row.mutual_count)
     }
     const allWishlistIds = rows.map(w => w.id)
     if (allWishlistIds.length > 0) {
@@ -146,10 +153,13 @@ export default async function FriendsPage() {
           {friends.map((friend, i) => {
             const count = friendWishlistCountMap.get(friend.id) ?? 0
             const itemCount = friendItemCountMap.get(friend.id) ?? 0
+            const mutualCount = mutualCountMap.get(friend.id) ?? 0
             const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
-            const subline = count === 0
-              ? birthday
-              : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
+            const parts: string[] = []
+            if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
+            if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
+            if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
+            const subline = parts.length > 0 ? parts.join(' • ') : null
             return (
               <li key={friend.id}>
                 {i > 0 && <div className="row-divider" />}
@@ -170,6 +180,7 @@ export default async function FriendsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
                     {subline && <p className="text-xs text-gray-400">{subline}</p>}
+                    {birthday && <p className="text-xs text-gray-400">{birthday}</p>}
                   </div>
                   <span className="shrink-0 text-gray-400">›</span>
                 </Link>

@@ -172,6 +172,7 @@ export default async function HomePage() {
     friendWishlistsResult,
     newWishlistsResult,
     reservedItemsResult,
+    mutualCountsResult,
   ] = await Promise.all([
     // Sender profiles for incoming request cards (depends on rawRequests)
     (async () => {
@@ -230,6 +231,11 @@ export default async function HomePage() {
         .select('id, title, wishlist_id')
         .in('id', reservedItemIds)
     })(),
+    // Mutual friend counts (depends on friendIds)
+    (async () => {
+      if (friendIds.length === 0) return { data: [] as Array<{ user_id: string; mutual_count: number }> }
+      return supabase.rpc('get_mutual_friend_counts', { p_user_ids: friendIds })
+    })(),
   ])
 
   // Process Round 2 results
@@ -270,6 +276,11 @@ export default async function HomePage() {
   }
 
   const reservedItems = (reservedItemsResult.data ?? []) as Array<{ id: string; title: string; wishlist_id: string }>
+
+  const mutualCountMap = new Map<string, number>()
+  for (const row of (mutualCountsResult.data ?? []) as Array<{ user_id: string; mutual_count: number }>) {
+    mutualCountMap.set(row.user_id, row.mutual_count)
+  }
 
   // Round 3: run in parallel — "Я подарю" wishlists + friend item counts
   const [itemWishlistsResult, friendItemCountsResult] = await Promise.all([
@@ -555,10 +566,13 @@ export default async function HomePage() {
                 {displayedFriends.map((friend, i) => {
                   const count = friendWishlistCountMap.get(friend.id) ?? 0
                   const itemCount = friendItemCountMap.get(friend.id) ?? 0
+                  const mutualCount = mutualCountMap.get(friend.id) ?? 0
                   const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
-                  const subline = count === 0
-                    ? birthday
-                    : `${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}${itemCount > 0 ? ` · ${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}` : ''}${birthday ? ` • ${birthday}` : ''}`
+                  const parts: string[] = []
+                  if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
+                  if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
+                  if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
+                  const subline = parts.length > 0 ? parts.join(' • ') : null
                   return (
                     <li key={friend.id}>
                       {i > 0 && <div className="row-divider" />}
@@ -579,6 +593,7 @@ export default async function HomePage() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
                           {subline && <p className="text-xs text-gray-400">{subline}</p>}
+                          {birthday && <p className="text-xs text-gray-400">{birthday}</p>}
                         </div>
                         <span className="shrink-0 text-gray-400">›</span>
                       </Link>

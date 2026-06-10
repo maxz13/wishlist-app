@@ -4,6 +4,39 @@ Platform-specific pitfalls, native UX invariants, cross-platform behavior requir
 
 ---
 
+## App Shell Layout Model
+
+The web app uses a fixed-container shell: `fixed inset-0` root → header (fixed, does not scroll) → scrollable content area → tab bar (in-flow, does not scroll). This maps directly to the standard iOS app shell:
+
+- Root container → `UIView` pinned to `safeAreaLayoutGuide` or screen edges
+- Header → `UINavigationBar` or custom fixed header view, `shrink-0` equivalent
+- Content area → `UIScrollView` (or `UITableView` / `UICollectionView`) that fills remaining space between header and tab bar
+- Tab bar → `UITabBar` at the bottom, in-flow (not overlapping content)
+
+**Key invariant:** only the content area scrolls. The header and tab bar are always fully visible. Do not design any screen where the header or tab bar can be obscured by scroll position.
+
+**Safe area:** the web version uses `pb-[env(safe-area-inset-bottom)]` on the tab bar container and `viewportFit: "cover"`. On iOS use `safeAreaInsets.bottom` on the tab bar's bottom constraint — never hardcode pixel values.
+
+---
+
+## Wishlist Title Inline Rename
+
+The wishlist title on the detail screen is directly editable by the owner — there is no separate "rename" modal or menu item.
+
+- Tap the title → heading is replaced in-place by a text field (`<input autoFocus>`)
+- Confirm: tap outside the field or press Enter → save
+- Cancel: press Escape → restore original title, no network call
+- Optimistic: the displayed title updates immediately on confirm; reverts if the server returns an error
+- No-op guard: if the trimmed new value equals the current title, no network call is made
+
+On iOS:
+- Tap on the title label → replace with `UITextField` in the same position, `becomeFirstResponder()`
+- Keyboard dismiss (return key or tap outside) → save
+- A dedicated "Cancel" affordance (e.g. swipe to dismiss or dedicated button) should trigger the cancel path
+- Do not use a separate rename sheet or `UIAlertController` — inline editing is the intended UX
+
+---
+
 ## Invite Sharing
 
 - Two distinct actions: **Copy** (puts formatted text on clipboard) and **Share** (opens native share sheet). Both must always be visible simultaneously — do not hide or collapse either.

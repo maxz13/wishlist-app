@@ -240,6 +240,18 @@ No functional indexes use `transliterate_ru`. No index rebuild was required afte
 
 ---
 
+## App Shell Architecture Note
+
+This file focuses on query performance. One additional fix that affected perceived performance was the app shell architecture change (separate from DB work):
+
+**Problem:** document-level scroll on iOS Safari caused the header and bottom nav to visually detach during rubber-band overscroll. Users experienced layout breakage that looked like a rendering performance issue.
+
+**Fix:** `app/(app)/layout.tsx` was rewritten to use `<div className="fixed inset-0 flex flex-col">` with only the content area (`flex-1 overflow-y-auto overscroll-y-contain`) scrolling. `html, body { overscroll-behavior: none }` added to `globals.css`. `viewportFit: "cover"` added to root layout viewport export. Bottom nav received `pb-[env(safe-area-inset-bottom)]`.
+
+This is purely a layout constraint. It has no interaction with Supabase query performance but is preserved here because it affects perceived smoothness on mobile.
+
+---
+
 ## Verification Checklist (completed)
 
 - [x] Build passed (`npm run build`)

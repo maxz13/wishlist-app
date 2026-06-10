@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { pluralRu } from '@/lib/format'
 import { sendFriendRequestAction, acceptFriendRequestAction } from './actions'
 
 type SearchResult = {
@@ -10,6 +11,7 @@ type SearchResult = {
   surname: string
   avatar_url: string | null
   username: string
+  mutual_count: number
 }
 
 type Props = {
@@ -101,6 +103,11 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">@{r.username}</p>
             <p className="text-xs text-gray-400">{r.name} {r.surname}</p>
+            {r.mutual_count > 0 && (
+              <p className="text-xs text-gray-400">
+                {r.mutual_count} {pluralRu(r.mutual_count, 'общий друг', 'общих друга', 'общих друзей')}
+              </p>
+            )}
           </div>
           <div className="shrink-0">
             {isFriend ? (
