@@ -97,3 +97,7 @@ select {
     background-color: #3a3a3c;
   }
 }
+
+.app-scroll-content {
+  padding-bottom: calc(74px + env(safe-area-inset-bottom));
+}

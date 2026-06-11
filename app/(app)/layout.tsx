@@ -55,8 +55,8 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col">
-      <header className="shrink-0 flex items-center bg-white dark:bg-[#1c1c1e] px-4 py-3">
+    <div className="fixed inset-0">
+      <header className="absolute top-0 left-0 right-0 z-10 flex items-center bg-white/40 dark:bg-[#1c1c1e]/40 backdrop-blur-md px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {profile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -81,7 +81,7 @@ export default async function AppLayout({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
+      <div className="absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content">{children}</div>
 
       <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} hasUnreadInvitedWishlists={(unseenWishlistCount ?? 0) > 0} />
     </div>

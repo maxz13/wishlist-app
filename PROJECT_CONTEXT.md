@@ -66,6 +66,16 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
+Session 2026-06-11. Social discovery polish + glass navigation deployed to production on `main`.
+
+Visual polish (2026-06-11):
+- Recommendation dismiss button softened: `opacity-75` added to `bg-red-500` button in `RecommendationsSection` — keeps red signal, reduces visual intensity
+- Glass header: `app/(app)/layout.tsx` header changed from opaque `bg-white` to `bg-white/40 dark:bg-[#1c1c1e]/40 backdrop-blur-md`; positioned `absolute top-0 left-0 right-0 z-10` (overlays scrollable content)
+- Glass bottom nav: `app/(app)/bottom-nav.tsx` nav changed from opaque `bg-[#fafafa]` to `bg-[#fafafa]/40 dark:bg-[#111111]/40 backdrop-blur-md`; positioned `absolute bottom-0 left-0 right-0 z-10`
+- Shell layout: outer wrapper `fixed inset-0 flex flex-col` → `fixed inset-0`; content div `flex-1 overflow-y-auto overscroll-y-contain` → `absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content`
+- `.app-scroll-content` utility added to `app/globals.css`: `padding-bottom: calc(74px + env(safe-area-inset-bottom))` — ensures last content item clears the overlaying nav on all devices including notch iPhones
+- Content now scrolls underneath translucent header and bottom nav, producing a real frosted-glass effect on iOS Safari/PWA (tested on device)
+
 Session 2026-06-10 (Phase 3). Friend recommendations and social discovery deployed to production on `main`.
 
 Friend recommendations (Phase 3, 2026-06-10):
@@ -260,7 +270,7 @@ Remaining work:
 
 ## Important technical decisions
 
-- **App shell architecture:** `app/(app)/layout.tsx` renders `<div className="fixed inset-0 flex flex-col">` — fixes iOS Safari viewport bugs where document-level scroll caused the header and bottom nav to detach during rubber-band overscroll. Structure: header `shrink-0`, content area `flex-1 overflow-y-auto overscroll-y-contain` (only this div scrolls), `<BottomNav>` in-flow `shrink-0`. Supporting rules: `html, body { overscroll-behavior: none }` in `globals.css`; `viewportFit: "cover"` in root layout viewport export; `pb-[env(safe-area-inset-bottom)]` on nav. Do not revert to document-level scrolling without approval.
+- **App shell architecture:** `app/(app)/layout.tsx` renders `<div className="fixed inset-0">` — fixes iOS Safari viewport bugs where document-level scroll caused the header and bottom nav to detach during rubber-band overscroll. Structure: header `absolute top-0 left-0 right-0 z-10` overlays content, content area `absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content` (only this div scrolls), `<BottomNav>` `absolute bottom-0 left-0 right-0 z-10` overlays content. Header and nav use `bg-*/40 backdrop-blur-md` for a glass effect — content scrolls visibly underneath them. Supporting rules: `html, body { overscroll-behavior: none }` in `globals.css`; `viewportFit: "cover"` in root layout viewport export; `pb-[env(safe-area-inset-bottom)]` on nav; `.app-scroll-content` provides `padding-bottom: calc(74px + env(safe-area-inset-bottom))`. Do not revert to document-level scrolling without approval. Do not revert to flex-col stacking without approval.
 - **Wishlist title inline rename:** `WishlistTitle` client component (`features/wishlists/wishlist-title.tsx`). State: `isEditing` boolean + `displayedTitle` string for optimistic display. Tap title → `isEditing = true`, title replaced with `<input autoFocus>`; Enter or `onBlur` → call `updateWishlistTitleAction`, set `displayedTitle` immediately (optimistic), revert on error; Escape → cancel, restore original. Server action not called if trimmed new value equals current title. Revalidates `/wishlists` and `/home` on save.
 - **Tailwind v4 blue bug:** `bg-blue-500` does not render. Use `bg-[#3b82f6]`. `text-blue-500` works fine.
 - **Tailwind v4 arbitrary class reliability:** Multi-value shadows and some dimension utilities unreliable in dev. Prefer named CSS classes in `app/globals.css`.

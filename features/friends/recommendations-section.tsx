@@ -104,7 +104,7 @@ export function RecommendationsSection({
                     onClick={() => handleDismiss(r.id)}
                     aria-label="Не показывать"
                     title="Не показывать"
-                    className="flex items-center justify-center rounded-lg bg-red-500 px-2 py-1.5 text-white"
+                    className="flex items-center justify-center rounded-lg bg-red-500 px-2 py-1.5 text-white opacity-75"
                   >
                     <X size={12} strokeWidth={2.5} />
                   </button>
