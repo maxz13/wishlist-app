@@ -60,11 +60,23 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Email confirmation: Resend configured as custom SMTP provider in Supabase dashboard (`smtp.resend.com`, port 465, API key as password). Supabase built-in mailer is NOT used.
 - Dark mode: system-preference only (`@media (prefers-color-scheme: dark)`, no toggle, no ThemeProvider, no localStorage). All surfaces use CSS custom properties; Tailwind `dark:` classes for one-off values (e.g. `dark:border-[#323234]`, `dark:bg-[#2c2c2e]`). Applied across all app pages, nav, and feature components. Auth pages intentionally excluded.
 - Wishlist title inline rename (owner only): tap the wishlist title on the detail page → inline `<input>` replaces the heading; Enter or tap outside → save via `updateWishlistTitleAction`; Escape → cancel and restore original; optimistic update applied immediately so there is no flicker after save; server action not called if the trimmed new value equals the current title; revalidates `/wishlists` and `/home`
+- Wishlist expiration settings: `expires_on DATE NULL` column on wishlists; creation form has compact Срок (До даты / Бессрочно `●/○` radio) and Видимость (Все друзья / Только я `●/○` radio) parameters below the title input; past-date ("Дата не может быть в прошлом") and max-year > 2099 ("Слишком оптимистично, укажите реальный срок") validation enforced client- and server-side; `WishlistExpiration` client component (`features/wishlists/wishlist-expiration.tsx`) renders below the wishlist title on the detail page — owner taps to enter edit mode (DD.MM.YYYY masked input, blur/Enter saves, Escape cancels, "или сделать бессрочным" inline right of input clears expiry); cursor positioned at 0 on edit open; first keystroke clears old value and starts fresh; lowercase "бессрочно" throughout; non-owners see "до ДД.ММ.ГГГГ" (hidden when бессрочно)
+- Wishlist auto-archive cron: `auto_archived_at TIMESTAMPTZ NULL` column set by cron on auto-archive; `vercel.json` registers Vercel Cron (`0 2 * * *`) pointing at `/api/cron/archive-expired` GET route (guarded by `Authorization: Bearer $CRON_SECRET`, uses `SUPABASE_SERVICE_ROLE_KEY` to bypass user-scoped RLS); archives all wishlists where `expires_on <= CURRENT_DATE AND is_archived = false`; home feed `wishlist_auto_archived` event queries own wishlists with `auto_archived_at IS NOT NULL AND >= sevenDaysAgo`; required Vercel env vars: `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`
 - Wishlist detail UI: wish rows (owner + friend views) wrapped in `.grouped-card` with `.item-divider` between rows and `px-4` per row; `CreateItemSection` rendered as first row inside the grouped-card (with `item-divider` above each wish); expanded create and edit forms both expand inline — no nested card surface; `OwnerItemList` always rendered for owners (no `items.length > 0` guard); hidden item indicator: `EyeOff` (lucide-react, size 16, `text-gray-400 dark:text-gray-500`) as left flex item when `isDraft && !showEditFields`; rows without price use `items-center` alignment; `WishlistAccessSection` wrapped in `.grouped-card px-4 py-4`; archive/restore buttons restyled as full-width `rounded-xl border` secondary buttons.
 
 ---
 
 ## Current focus
+
+Session 2026-06-11. Wishlist expiration + auto-archive flow deployed to production on `main`.
+
+Wishlist expiration (2026-06-11):
+- `wishlists.expires_on DATE NULL` + `wishlists.auto_archived_at TIMESTAMPTZ NULL` columns — migration `20260611000000` must be applied manually in SQL editor
+- Creation form: Срок (До даты / Бессрочно) + Видимость (Все друзья / Только я) compact `●/○` radio options; DD.MM.YYYY masked date input; past-date + max-year > 2099 validation both client and server; `create-wishlist-section.tsx` and `actions.ts` extended
+- Detail page: `WishlistExpiration` component below title; tap → inline masked edit; "или сделать бессрочным" inline right; cursor at 0 on open; first keystroke clears old value; `updateWishlistExpirationAction` server action
+- Cron: `vercel.json` adds `0 2 * * *`; `/api/cron/archive-expired` uses `SUPABASE_SERVICE_ROLE_KEY`; guarded by `CRON_SECRET`
+- Home feed: `wishlist_auto_archived` event type added (own wishlists auto-archived in last 7 days)
+- Plus button: removed `?create=1` URL param + `searchParams` from `/wishlists/page.tsx`; cross-route tap sets `sessionStorage('wishlist-create-pending')` synchronously; `CreateWishlistSection` `useLayoutEffect` on mount reads + clears flag, expands, and RAF-focuses title input; on-page dispatch (`wishlist-create-focus`) unchanged
 
 Session 2026-06-11. Social discovery polish + glass navigation deployed to production on `main`.
 
@@ -265,6 +277,7 @@ Remaining work:
 | 20260610000000 | Applied | `get_mutual_friend_counts(p_user_ids uuid[])` batch RPC — returns mutual friend counts for friends list and search results |
 | 20260610000001 | Applied | `profiles.friends_list_visibility` column + `get_mutual_friends` + `get_friends_of_friend` SECURITY DEFINER RPCs |
 | 20260610000002 | Applied | `friend_recommendation_dismissals` table + `get_friend_recommendations(p_limit int)` SECURITY DEFINER RPC |
+| 20260611000000 | Pending (manual) | `wishlists.expires_on DATE NULL` + `wishlists.auto_archived_at TIMESTAMPTZ NULL` — run in SQL editor: `ALTER TABLE wishlists ADD COLUMN expires_on DATE NULL; ALTER TABLE wishlists ADD COLUMN auto_archived_at TIMESTAMPTZ NULL;` then `NOTIFY pgrst, 'reload schema';` |
 
 ---
 
@@ -285,7 +298,7 @@ Remaining work:
 - **Username is immutable after registration.** CHECK: `^[a-z][a-z0-9_]{1,28}[a-z0-9]$`, no `__`. Min 3 chars.
 - **Username auto-generation:** `generate_username(name, surname)` DB function. Mirrored in `register-form.tsx` (`buildUsernamePreview`) — keep in sync.
 - **Activity feed grouping:** `new_items` group by `(owner_id, wishlist_id, calendar_day)` in JS.
-- **Activity feed event types:** `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_access_granted`. All computed at query time from existing tables — no events table.
+- **Activity feed event types:** `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_access_granted`, `wishlist_auto_archived`. All computed at query time from existing tables — no events table. `wishlist_auto_archived` queries the current user's own wishlists where `auto_archived_at IS NOT NULL AND >= sevenDaysAgo`.
 - **`wishlist_item_reserved` label:** deterministic from reservation UUID char-code sum mod 4 — same event always shows same text across renders.
 - **`wishlist_access_granted` feed event:** REMOVED from feed (2026-06-05). All `wishlist_access` entries are `selected_friends` by definition — showing them in the feed leaks private wishlist names.
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.
@@ -330,6 +343,11 @@ Remaining work:
 - **Recommendation dismiss UX:** inline red `bg-red-500` square button to the right of the primary action button (same height, `px-2 py-1.5`); hidden once request is sent (`!isOutgoing` guard). Accepted users disappear entirely from visible list via `acceptedIds` Set.
 - **Home page conditional swap:** if `get_friend_recommendations` returns > 0 rows → render `RecommendationsSection` (slice 0-3) under "Возможно, вы знакомы" heading with "Все рекомендации ›" link to `/friends`; else → render existing Друзья block unchanged. The two branches share no code — no fallback prop threading.
 - **Dark mode approach:** `@media (prefers-color-scheme: dark)` only — no ThemeProvider, no toggle, no `class="dark"`, no localStorage. All primary surface values use CSS custom properties. Tailwind `dark:` utility classes for one-off values. Auth pages intentionally excluded from dark mode styling.
+
+- **Wishlist expiration fields:** `wishlists.expires_on DATE NULL` (owner-set deadline; `NULL` = бессрочно) + `wishlists.auto_archived_at TIMESTAMPTZ NULL` (set by cron only; never by UI). Display format `DD.MM.YYYY` ↔ DB ISO `YYYY-MM-DD`; converted in `isoToDisplay()` and in server actions. Validation: past date rejected, year > 2099 rejected, today allowed. Both fields added by migration `20260611000000` (manual apply required).
+- **Cron route (`/api/cron/archive-expired`):** GET handler. Validates `Authorization: Bearer $CRON_SECRET` header. Uses Supabase client initialised with `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS). Updates `is_archived = true, auto_archived_at = now()` for all rows where `expires_on <= CURRENT_DATE AND is_archived = false`. Registered in `vercel.json` at schedule `0 2 * * *`. Required Vercel env vars: `CRON_SECRET` (any secret string) and `SUPABASE_SERVICE_ROLE_KEY` (from Supabase project → Settings → API). Without these vars the cron silently skips or returns 401.
+- **Plus button create card focus:** from non-/wishlists routes: click handler sets `sessionStorage.setItem('wishlist-create-pending', '1')` synchronously within the user gesture, then navigation to `/wishlists` proceeds normally. `CreateWishlistSection.useLayoutEffect` (fires before paint) on mount reads + removes the flag, calls `setExpanded(true)` (triggers synchronous re-render with `autoFocus` input), then RAF-focuses `titleInputRef`. From /wishlists: `e.preventDefault()` + `window.dispatchEvent(new Event('wishlist-create-focus'))` as before. The `?create=1` query-param mechanism and `await searchParams` in `/wishlists/page.tsx` were removed — page no longer has a searchParams dynamic signal, improving prefetch eligibility. iOS keyboard after cross-route navigation is best-effort.
+- **`WishlistExpiration` inline edit patterns:** `startFreshRef = useRef(false)` set true on edit start; first `onChange` event discards all existing digits and uses only the first raw digit from `e.target.value` (cursor was at position 0, so this is the typed char); subsequent calls use normal 8-digit extraction + dot-insertion mask. Cursor reset via `requestAnimationFrame(() => input.setSelectionRange(0, 0))` — not `.select()`. `timelessRef` on the "бессрочным" button enables `relatedTarget` check in `onBlur` (skips premature save on mobile); `onMouseDown e.preventDefault()` on the same button prevents input blur on desktop.
 
 ---
 

@@ -94,12 +94,14 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
             chain and renders reliably in Tailwind v4. */}
         <div className="-mt-[18px] flex flex-1 items-center justify-center">
           <Link
-            href="/wishlists?create=1"
+            href="/wishlists"
             aria-label="Создать вишлист"
             onClick={(e) => {
               if (pathname === '/wishlists') {
                 e.preventDefault()
                 window.dispatchEvent(new Event('wishlist-create-focus'))
+              } else {
+                sessionStorage.setItem('wishlist-create-pending', '1')
               }
             }}
             className="flex h-16 w-16 items-center justify-center rounded-full bg-[#3b82f6] text-white shadow-lg"

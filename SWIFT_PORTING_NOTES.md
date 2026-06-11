@@ -109,3 +109,34 @@ On iOS:
 
 - The current web feed has no historical event log — everything is computed live from existing rows. Deleted rows leave no trace.
 - Do not design an iOS feed that assumes historical events (e.g., "X unfriended you", "Y left your wishlist") without first building an `activity_log` table. Design within the live-query model, or build the table first.
+- `wishlist_auto_archived` is an event type computed from `wishlists.auto_archived_at IS NOT NULL` for the current user's own wishlists — it is informational, not interactive. On iOS consider a local notification (1 day before expiry) as a complement to the feed entry.
+
+---
+
+## Wishlist Expiration
+
+- Each wishlist has an optional expiration date (`expires_on DATE NULL`). `NULL` = бессрочно. When the date passes the wishlist is automatically archived by a daily server cron.
+- **Owner — detail screen:** expiration renders below the title. Tap to enter edit mode. Display: "бессрочно" (null) or "до ДД.ММ.ГГГГ" (date set). Edit mode: DD.MM.YYYY masked text field + "или сделать бессрочным" action to the right of the field; blur/return saves, Escape cancels, optimistic update with server revert on error.
+- **Non-owner — detail screen:** shows "до ДД.ММ.ГГГГ" if a date is set; hidden entirely when бессрочно.
+- **Date field edit UX:** on entering edit mode the cursor is placed at position 0 (not end, not full selection). The first keystroke clears the old date and starts fresh — digit 1 becomes the day-tens digit, digit 2 the day-units, etc. Do not implement per-character in-place overwrite at launch; "first keystroke clears" is the approved UX.
+- **Validation (both client and server):** past dates rejected; year > 2099 rejected; today allowed.
+- **Auto-archive notification:** on iOS consider a local `UNUserNotificationCenter` notification scheduled 1 day before `expires_on` — the web app has no push notifications for this event.
+
+---
+
+## Wishlist Create Form — Expiration and Visibility
+
+The create wishlist form has two additional compact parameters below the title field:
+
+- **Срок** (expiration): `●` До даты / `○` Бессрочно — when "До даты" is selected a DD.MM.YYYY date field appears with the same validation as the detail page editor.
+- **Видимость** (visibility): `●` Все друзья / `○` Только я — maps to `all_friends` / `private`. A third mode `selected_friends` is added post-creation via the detail page access section.
+
+On iOS: implement as compact inline option rows below the title input, using the same `●/○` radio pattern used in privacy settings. Keep the form tight — no full-screen modal for creation.
+
+---
+
+## Cross-Route Focus and Keyboard Handling
+
+- **Web limitation:** iOS Safari only opens the software keyboard when `focus()` is called synchronously within a trusted user gesture handler. After client-side route navigation (which is async), `autoFocus` and imperative `.focus()` calls land outside the gesture window — the keyboard may not open automatically on the first navigation.
+- **iOS advantage:** `becomeFirstResponder()` called during `viewDidAppear` or during a push/present animation reliably opens the keyboard. This is a strict improvement over web behavior.
+- **Desired behavior on iOS:** tapping the plus button in the tab bar from any tab → navigate to Wishlists tab → expand create card → open keyboard on the title field — all in one gesture, no second tap required. Use `becomeFirstResponder()` in `viewWillAppear` or after the navigation animation completes.

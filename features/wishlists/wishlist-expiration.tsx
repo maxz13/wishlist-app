@@ -23,19 +23,21 @@ export function WishlistExpiration({
   const [error,     setError]     = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  const inputRef    = useRef<HTMLInputElement>(null)
+  const inputRef      = useRef<HTMLInputElement>(null)
+  const startFreshRef = useRef(false)
   // Ref used in onBlur → relatedTarget check to skip blur when tapping "Бессрочно"
-  const timelessRef = useRef<HTMLButtonElement>(null)
+  const timelessRef   = useRef<HTMLButtonElement>(null)
 
-  // When editing starts, defer focus+select until after the browser finishes its
-  // own autoFocus handling (onFocus fires too early — browser resets cursor after it).
+  // When editing starts: defer focus, position cursor at start (no selection),
+  // and mark that the next keystroke should start a fresh replacement sequence.
   useEffect(() => {
     if (!editing) return
+    startFreshRef.current = true
     const input = inputRef.current
     if (!input) return
     requestAnimationFrame(() => {
       input.focus()
-      input.select()
+      input.setSelectionRange(0, 0)
     })
   }, [editing])
 
@@ -54,6 +56,15 @@ export function WishlistExpiration({
   }
 
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (startFreshRef.current) {
+      startFreshRef.current = false
+      // Cursor was at position 0; the typed digit is the first digit of the new value.
+      // Discard all existing digits and start fresh with just the one typed.
+      const freshDigit = e.target.value.replace(/\D/g, '').slice(0, 1)
+      setValue(freshDigit)
+      setError(null)
+      return
+    }
     const digits = e.target.value.replace(/\D/g, '').slice(0, 8)
     let formatted = digits
     if (digits.length > 2) formatted = digits.slice(0, 2) + '.' + digits.slice(2)
@@ -122,32 +133,34 @@ export function WishlistExpiration({
   if (editing) {
     return (
       <div>
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          placeholder="ДД.ММ.ГГГГ"
-          value={value}
-          onChange={handleDateChange}
-          onBlur={(e) => {
-            // If focus is moving to the "Бессрочно" button, let its onClick handle the save
-            if (e.relatedTarget === timelessRef.current) return
-            validateAndSave('cancel')
-          }}
-          onKeyDown={handleKeyDown}
-          className="w-28 bg-transparent text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
-        />
-        <button
-          ref={timelessRef}
-          type="button"
-          // onMouseDown preventDefault keeps focus on the input on desktop,
-          // so relatedTarget check handles mobile and onMouseDown handles desktop.
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => commitSave(null, '')}
-          className="mt-0.5 block text-[11px] text-gray-400"
-        >
-          сделать бессрочным
-        </button>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            placeholder="ДД.ММ.ГГГГ"
+            value={value}
+            onChange={handleDateChange}
+            onBlur={(e) => {
+              // If focus is moving to the "Бессрочно" button, let its onClick handle the save
+              if (e.relatedTarget === timelessRef.current) return
+              validateAndSave('cancel')
+            }}
+            onKeyDown={handleKeyDown}
+            className="w-28 bg-transparent text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none"
+          />
+          <button
+            ref={timelessRef}
+            type="button"
+            // onMouseDown preventDefault keeps focus on the input on desktop,
+            // so relatedTarget check handles mobile and onMouseDown handles desktop.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => commitSave(null, '')}
+            className="py-1 text-xs text-gray-400"
+          >
+            или сделать бессрочным
+          </button>
+        </div>
         {error && <p className="mt-0.5 text-[10px] leading-tight text-red-600">{error}</p>}
       </div>
     )

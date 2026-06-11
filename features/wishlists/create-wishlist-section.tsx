@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useLayoutEffect } from 'react'
 import { createWishlistAction } from './actions'
 import type { CreateWishlistState } from './actions'
 
 type ExpiryMode = 'date' | 'timeless'
 type Visibility  = 'all_friends' | 'private'
 
-export function CreateWishlistSection({ autoExpand = false }: { autoExpand?: boolean }) {
-  const [expanded,   setExpanded]   = useState(autoExpand)
+export function CreateWishlistSection() {
+  const [expanded,   setExpanded]   = useState(false)
   const [title,      setTitle]      = useState('')
   const [expiryMode, setExpiryMode] = useState<ExpiryMode>('date')
   const [dateValue,  setDateValue]  = useState('')
@@ -19,8 +19,9 @@ export function CreateWishlistSection({ autoExpand = false }: { autoExpand?: boo
   const isPristine = !title && !dateValue && expiryMode === 'date' && visibility === 'all_friends'
 
   // Stable refs so effects don't re-attach on every keystroke
-  const cardRef       = useRef<HTMLDivElement>(null)
-  const isPristineRef = useRef(isPristine)
+  const cardRef        = useRef<HTMLDivElement>(null)
+  const titleInputRef  = useRef<HTMLInputElement>(null)
+  const isPristineRef  = useRef(isPristine)
   const collapseRef   = useRef<() => void>(null!)
   isPristineRef.current = isPristine
 
@@ -33,6 +34,18 @@ export function CreateWishlistSection({ autoExpand = false }: { autoExpand?: boo
     setState(undefined)
   }
   collapseRef.current = collapse
+
+  // Cross-route navigation: plus button sets this flag synchronously before navigating
+  useLayoutEffect(() => {
+    if (sessionStorage.getItem('wishlist-create-pending') !== '1') return
+    sessionStorage.removeItem('wishlist-create-pending')
+    setExpanded(true)
+    // autoFocus on the title input fires during the synchronous re-render triggered
+    // above; RAF is belt-and-suspenders for devices where autoFocus is unreliable
+    requestAnimationFrame(() => {
+      titleInputRef.current?.focus()
+    })
+  }, [])
 
   // Collapse on tap-outside only when the card is pristine (untouched)
   useEffect(() => {
@@ -117,6 +130,7 @@ export function CreateWishlistSection({ autoExpand = false }: { autoExpand?: boo
         {/* Title */}
         <div className="px-4 py-3">
           <input
+            ref={titleInputRef}
             type="text"
             placeholder="Название"
             required
