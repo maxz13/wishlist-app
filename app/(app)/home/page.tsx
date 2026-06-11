@@ -6,6 +6,7 @@ import { IncomingRequestsSection } from '@/features/friends/incoming-requests-se
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
 import { ExpirationGuideCard } from '@/features/wishlists/expiration-guide-card'
+import { CreateWishlistTrigger } from '@/features/wishlists/create-wishlist-trigger'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
@@ -491,12 +492,9 @@ export default async function HomePage() {
             Создайте вишлист или пригласите друзей — здесь появятся их желания.
           </p>
           <div className="mt-2 flex w-full max-w-xs flex-col gap-3">
-            <Link
-              href="/wishlists"
-              className="rounded-xl bg-gray-900 dark:bg-white py-3 text-center text-sm font-medium text-white dark:text-gray-900"
-            >
+            <CreateWishlistTrigger className="rounded-xl bg-gray-900 dark:bg-white py-3 text-center text-sm font-medium text-white dark:text-gray-900">
               Создать вишлист
-            </Link>
+            </CreateWishlistTrigger>
             <Link
               href="/friends"
               className="rounded-xl border border-gray-300 dark:border-[#323234] py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300"
@@ -738,12 +736,9 @@ export default async function HomePage() {
 
         {/* State C: has friends but no wishlists */}
         {hasFriends && !hasWishlists && (
-          <Link
-            href="/wishlists"
-            className="mt-8 rounded-xl border border-gray-300 dark:border-[#323234] px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300 sm:mt-10"
-          >
+          <CreateWishlistTrigger className="mt-8 rounded-xl border border-gray-300 dark:border-[#323234] px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-300 sm:mt-10">
             Создать первый вишлист
-          </Link>
+          </CreateWishlistTrigger>
         )}
 
         {/* 3. Я подарю */}

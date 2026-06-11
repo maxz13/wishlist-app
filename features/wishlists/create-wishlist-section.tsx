@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect, useLayoutEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { createWishlistAction } from './actions'
 import type { CreateWishlistState } from './actions'
 
@@ -16,13 +17,17 @@ export function CreateWishlistSection() {
   const [state,      setState]      = useState<CreateWishlistState>(undefined)
   const [pending,    startTransition] = useTransition()
 
+  const pathname = usePathname()
+
   const isPristine = !title && !dateValue && expiryMode === 'date' && visibility === 'all_friends'
 
   // Stable refs so effects don't re-attach on every keystroke
   const cardRef        = useRef<HTMLDivElement>(null)
   const titleInputRef  = useRef<HTMLInputElement>(null)
   const isPristineRef  = useRef(isPristine)
-  const collapseRef   = useRef<() => void>(null!)
+  const collapseRef             = useRef<() => void>(null!)
+  const expandPendingRef        = useRef<() => void>(null!)
+  const suppressCollapseUntilRef = useRef(0)
   isPristineRef.current = isPristine
 
   function collapse() {
@@ -34,23 +39,28 @@ export function CreateWishlistSection() {
     setState(undefined)
   }
   collapseRef.current = collapse
-
-  // Cross-route navigation: plus button sets this flag synchronously before navigating
-  useLayoutEffect(() => {
+  expandPendingRef.current = () => {
     if (sessionStorage.getItem('wishlist-create-pending') !== '1') return
     sessionStorage.removeItem('wishlist-create-pending')
+    suppressCollapseUntilRef.current = Date.now() + 450
     setExpanded(true)
-    // autoFocus on the title input fires during the synchronous re-render triggered
-    // above; RAF is belt-and-suspenders for devices where autoFocus is unreliable
-    requestAnimationFrame(() => {
-      titleInputRef.current?.focus()
-    })
-  }, [])
+    requestAnimationFrame(() => { titleInputRef.current?.focus() })
+  }
+
+  // On fresh mount: consume the flag immediately (synchronous, before paint)
+  useLayoutEffect(() => { expandPendingRef.current() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On pathname change: consume the flag if App Router reuses the component
+  // instance from its router cache instead of remounting
+  useEffect(() => {
+    if (pathname === '/wishlists') expandPendingRef.current()
+  }, [pathname])
 
   // Collapse on tap-outside only when the card is pristine (untouched)
   useEffect(() => {
     if (!expanded) return
     function onPointerDown(e: PointerEvent) {
+      if (Date.now() < suppressCollapseUntilRef.current) return
       if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
         if (isPristineRef.current) collapseRef.current()
       }

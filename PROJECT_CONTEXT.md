@@ -69,7 +69,7 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
-Session 2026-06-12. Wishlist expiration onboarding deployed to production on `main`.
+Session 2026-06-12. Wishlist expiration onboarding + Home empty-state CTA fix deployed to production on `main`.
 
 Expiration onboarding (2026-06-12):
 - Migration `20260612000000`: `profiles.wishlist_expiration_guide_completed_at TIMESTAMPTZ NULL` — apply in SQL editor
@@ -78,6 +78,10 @@ Expiration onboarding (2026-06-12):
 - `WishlistExpiration` extended: `showGuide` prop; `guideActive` state; blue `bg-blue-50 rounded-lg` highlight + "Нажмите на срок, чтобы изменить его" hint text; `enterEdit()` dismisses guide + `router.replace` strips param; `gap-x-2` → `gap-x-1.5` in edit mode
 - Home page: `expires_on` added to wishlists query + `Wishlist` type; profile flags query added to Round 1; guide conditions computed after Round 1
 - Detail page: `guide?: string` added to searchParams; `showGuide={isOwner && guide === 'expiration'}` passed to `WishlistExpiration`
+
+Home empty-state CTA fix (2026-06-12):
+- `CreateWishlistTrigger` (`features/wishlists/create-wishlist-trigger.tsx`) — thin Client Component wrapper around `<Link>` that sets `sessionStorage('wishlist-create-pending', '1')` synchronously in `onClick`; used in place of plain `<Link>` in Home State A and State C empty states
+- `CreateWishlistSection` extended: `usePathname` + `useEffect([pathname])` as second expansion trigger covering App Router cache reuse (component not remounted); `expandPendingRef` ref-backed helper to deduplicate mount + pathname logic; `suppressCollapseUntilRef` 450ms timestamp guard in `onPointerDown` prevents iOS Safari ghost tap from collapsing the freshly expanded card
 
 Session 2026-06-11. Wishlist expiration + auto-archive flow deployed to production on `main`.
 
@@ -362,6 +366,9 @@ Remaining work:
 - **`WishlistExpiration` inline edit patterns:** `startFreshRef = useRef(false)` set true on edit start; first `onChange` event discards all existing digits and uses only the first raw digit from `e.target.value` (cursor was at position 0, so this is the typed char); subsequent calls use normal 8-digit extraction + dot-insertion mask. Cursor reset via `requestAnimationFrame(() => input.setSelectionRange(0, 0))` — not `.select()`. `timelessRef` on the "бессрочным" button enables `relatedTarget` check in `onBlur` (skips premature save on mobile); `onMouseDown e.preventDefault()` on the same button prevents input blur on desktop.
 - **One-time feature guide pattern (profiles column):** per-feature `TIMESTAMPTZ NULL` column on `profiles` — NULL = guide eligible, NOT NULL = dismissed/completed (timestamp records when). Server Action `dismissXxxGuideAction()` writes `now()` + revalidates the page. Client component uses `useState(true)` for optimistic hide + `useTransition` for background server write. Never show the guide again once dismissed, even on re-login. Applied to: `wishlist_expiration_guide_completed_at`.
 - **`showGuide` prop pattern for detail-page highlights:** Server Component reads `guide` from `searchParams`, passes `showGuide={isOwner && guide === '...'}` to Client Component. Client component holds `guideActive` state initialised from prop. On entering edit mode: `setGuideActive(false)`, call dismiss action in `startTransition`, `router.replace(`/wishlists/${id}`)` strips param from URL (no history entry). This keeps the guide dismiss atomic with the edit entry — the user never sees the highlight again after tapping it.
+- **`CreateWishlistTrigger` component:** thin `'use client'` wrapper around `<Link>` (`features/wishlists/create-wishlist-trigger.tsx`) that sets `sessionStorage('wishlist-create-pending', '1')` synchronously in `onClick` before navigation. Used on the Home page empty-state cards (State A and State C) to reuse the exact same creation flow as the blue `+` button — no second creation flow, no new navigation logic. Server Components that previously used `<Link href="/wishlists">` must use `<CreateWishlistTrigger>` when the intent is to open the create card.
+- **App Router cache reuse — `usePathname` secondary expansion trigger:** `CreateWishlistSection` cannot rely solely on `useLayoutEffect([])` (mount-only) because Next.js App Router may reuse a cached component instance without remounting when navigating back to the same route. The `useEffect([pathname])` secondary effect re-runs `expandPendingRef.current()` whenever `pathname` changes to `/wishlists`, catching the cache-reuse case. Both effects are deduplicated: the helper checks `sessionStorage.getItem` and returns early if the flag is absent.
+- **`suppressCollapseUntilRef` — iOS Safari ghost tap guard:** after programmatic card expansion (via the pending-create flag), iOS Safari fires a synthetic `pointerdown` at the same screen coordinates ~300ms later. This lands on the now-visible card's backdrop, triggering the tap-outside collapse. Fix: `suppressCollapseUntilRef = useRef(0)` holds `Date.now() + 450` for 450ms after programmatic expansion only; `onPointerDown` returns early while `Date.now() < suppressCollapseUntilRef.current`. Manual expansion (tap on the collapsed card button) leaves the ref at 0 — normal tap-outside collapse behavior unchanged. No setTimeout, no timer cleanup needed.
 
 ---
 
