@@ -30,3 +30,22 @@ export function friendBirthdayLine(birthdayIso: string, today: Date): string {
   const [, month, day] = birthdayIso.split('-').map(Number)
   return `День рождения ${day} ${MONTHS_RU[month - 1]}`
 }
+
+// Feed label for upcoming birthday events (daysUntil >= 2).
+// daysUntil === 1 is handled separately by the caller ("Завтра день рождения у …").
+export function birthdayFeedLabel(daysUntil: number): string {
+  if (daysUntil <= 3) return `через ${daysUntil} ${pluralRu(daysUntil, 'день', 'дня', 'дней')}`
+  if (daysUntil <= 7) return 'через неделю'
+  return 'через 2 недели'
+}
+
+// Russian genitive/accusative count phrase for new-friends feed events (Phase 2).
+// 1 → "одного нового друга", 2-5 → spelled-out genitive, 6+ → numeral.
+export function newFriendCountLabel(n: number): string {
+  if (n === 1) return 'одного нового друга'
+  if (n === 2) return 'двух новых друзей'
+  if (n === 3) return 'трёх новых друзей'
+  if (n === 4) return 'четырёх новых друзей'
+  if (n === 5) return 'пять новых друзей'
+  return `${n} новых друзей`
+}

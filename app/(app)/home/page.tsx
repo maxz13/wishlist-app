@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { pluralRu, friendBirthdayLine } from '@/lib/format'
+import { pluralRu, friendBirthdayLine, getDaysUntilBirthday, birthdayFeedLabel } from '@/lib/format'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
@@ -23,7 +23,7 @@ type WishlistActivityRow = {
   id: string
   title: string
   created_at: string
-  profiles: { id: string; name: string; surname: string }
+  owner_id: string
 }
 type ItemActivityRow = {
   id: string
@@ -36,7 +36,6 @@ type ItemActivityRow = {
     owner_id: string
     is_archived: boolean
     visibility: string
-    profiles: { id: string; name: string; surname: string }
   }
 }
 type ReservedActivityRow = {
@@ -49,23 +48,12 @@ type ReservedActivityRow = {
     wishlists: { id: string; owner_id: string; title: string; is_archived: boolean; visibility: string }
   }
 }
-type AccessGrantedRow = {
-  created_at: string
-  wishlists: {
-    id: string
-    title: string
-    owner_id: string
-    is_archived: boolean
-    profiles: { id: string; name: string; surname: string }
-  }
-}
-
 type ActivityEvent =
+  | { type: 'birthday_approaching';     friendId: string; friendName: string; daysUntil: number; ts: string }
   | { type: 'new_friend';               friendId: string; friendName: string; friendSurname: string; ts: string }
   | { type: 'new_wishlist';             wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_items';                count: number; singleTitle: string | null; titles: string[]; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_items';                count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
   | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; wishlistId: string; wishlistTitle: string; label: string; ts: string }
-  | { type: 'wishlist_access_granted';  wishlistId: string; wishlistTitle: string; ownerId: string; ownerName: string; ts: string }
   | { type: 'wishlist_auto_archived';   wishlistId: string; wishlistTitle: string; ts: string }
 
 const RESERVED_LABELS = [
@@ -107,7 +95,7 @@ export default async function HomePage() {
   if (!user) redirect('/login')
 
   const today        = new Date()
-  const sevenDaysAgo = new Date(today.getTime() - 7 * 86_400_000).toISOString()
+  const fourteenDaysAgo = new Date(today.getTime() - 14 * 86_400_000).toISOString()
 
   type SenderProfile = { id: string; name: string; surname: string; username: string; avatar_url: string | null }
 
@@ -119,7 +107,6 @@ export default async function HomePage() {
     myReservationsResult,
     newItemsResult,
     newReservationsResult,
-    accessGrantedResult,
     recommendationsResult,
     autoArchivedResult,
     profileFlagsResult,
@@ -143,23 +130,16 @@ export default async function HomePage() {
       .eq('reserved_by_user_id', user!.id),
     supabase
       .from('wishlist_items')
-      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, is_archived, visibility, profiles!inner(id, name, surname))')
+      .select('id, title, created_at, wishlist_id, wishlists!inner(id, title, owner_id, is_archived, visibility)')
       .eq('is_visible', true)
-      .gte('created_at', sevenDaysAgo)
+      .gte('created_at', fourteenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(100),
     supabase
       .from('reservations')
       .select('id, created_at, reserved_by_user_id, wishlist_items!inner(id, title, wishlists!inner(id, owner_id, title, is_archived, visibility))')
       .neq('reserved_by_user_id', user!.id)
-      .gte('created_at', sevenDaysAgo)
-      .order('created_at', { ascending: false })
-      .limit(50),
-    supabase
-      .from('wishlist_access')
-      .select('created_at, wishlists!inner(id, title, owner_id, is_archived, profiles!inner(id, name, surname))')
-      .eq('user_id', user!.id)
-      .gte('created_at', sevenDaysAgo)
+      .gte('created_at', fourteenDaysAgo)
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.rpc('get_friend_recommendations', { p_limit: 8 }),
@@ -168,7 +148,7 @@ export default async function HomePage() {
       .select('id, title, auto_archived_at')
       .eq('owner_id', user!.id)
       .not('auto_archived_at', 'is', null)
-      .gte('auto_archived_at', sevenDaysAgo)
+      .gte('auto_archived_at', fourteenDaysAgo)
       .order('auto_archived_at', { ascending: false })
       .limit(10),
     supabase
@@ -252,11 +232,11 @@ export default async function HomePage() {
       if (friendIds.length === 0) return { data: [] as WishlistActivityRow[] }
       return supabase
         .from('wishlists')
-        .select('id, title, created_at, profiles!inner(id, name, surname)')
+        .select('id, title, created_at, owner_id')
         .in('owner_id', friendIds)
         .eq('is_archived', false)
         .eq('visibility', 'all_friends')
-        .gte('created_at', sevenDaysAgo)
+        .gte('created_at', fourteenDaysAgo)
         .order('created_at', { ascending: false })
         .limit(50)
     })(),
@@ -356,7 +336,7 @@ export default async function HomePage() {
 
   // new_friend: friendships formed in last 7 days
   const newFriendEvents: ActivityEvent[] = friendshipRows
-    .filter((f) => f.created_at >= sevenDaysAgo)
+    .filter((f) => f.created_at >= fourteenDaysAgo)
     .flatMap((f) => {
       const profile = profileById.get(f.friend_id)
       if (!profile) return []
@@ -370,41 +350,46 @@ export default async function HomePage() {
     })
 
   // new_wishlist: one event per wishlist created by a friend
-  const newWishlistEvents: ActivityEvent[] = newWishlistsRaw.map((w) => ({
-    type:          'new_wishlist' as const,
-    wishlistId:    w.id,
-    wishlistTitle: w.title,
-    friendId:      w.profiles.id,
-    friendName:    w.profiles.name,
-    ts:            w.created_at,
-  }))
+  const newWishlistEvents: ActivityEvent[] = newWishlistsRaw.flatMap((w) => {
+    const profile = profileById.get(w.owner_id)
+    if (!profile) return []
+    return [{
+      type:          'new_wishlist' as const,
+      wishlistId:    w.id,
+      wishlistTitle: w.title,
+      friendId:      profile.id,
+      friendName:    profile.name,
+      ts:            w.created_at,
+    }]
+  })
 
   // new_items: group by (owner_id, wishlist_id, calendar day) to avoid spam
   // when a friend adds many items to the same wishlist in one sitting.
+  // Group by (owner, wishlist) across the full rolling window — one event per wishlist
   const itemGroupMap = new Map<string, ItemActivityRow[]>()
   for (const item of newItemsRaw) {
-    const day = new Date(item.created_at).toDateString()
-    const key = `${item.wishlists.owner_id}__${item.wishlist_id}__${day}`
+    const key = `${item.wishlists.owner_id}__${item.wishlist_id}`
     if (!itemGroupMap.has(key)) itemGroupMap.set(key, [])
     itemGroupMap.get(key)!.push(item)
   }
-  const newItemEvents: ActivityEvent[] = Array.from(itemGroupMap.values()).map((group) => {
-    const first    = group[0]
+  const newItemEvents: ActivityEvent[] = Array.from(itemGroupMap.values()).flatMap((group) => {
+    const first   = group[0]
+    const profile = profileById.get(first.wishlists.owner_id)
+    if (!profile) return []
     const latestTs = group.reduce(
       (max, i) => (i.created_at > max ? i.created_at : max),
       group[0].created_at,
     )
-    return {
+    return [{
       type:          'new_items' as const,
       count:         group.length,
       singleTitle:   group.length === 1 ? first.title : null,
-      titles:        group.map(i => i.title),
       wishlistId:    first.wishlist_id,
       wishlistTitle: first.wishlists.title,
-      friendId:      first.wishlists.profiles.id,
-      friendName:    first.wishlists.profiles.name,
+      friendId:      profile.id,
+      friendName:    profile.name,
       ts:            latestTs,
-    }
+    }]
   })
 
   // wishlist_item_reserved: items owned by current user that were reserved by someone else
@@ -420,17 +405,21 @@ export default async function HomePage() {
       ts:            r.created_at,
     }))
 
-  // wishlist_access_granted: current user was added to a friend's private wishlist
-  const accessGrantedEvents: ActivityEvent[] = ((accessGrantedResult.data ?? []) as unknown as AccessGrantedRow[])
-    .filter((r) => r.wishlists.owner_id !== user!.id && !r.wishlists.is_archived)
-    .map((r) => ({
-      type:          'wishlist_access_granted' as const,
-      wishlistId:    r.wishlists.id,
-      wishlistTitle: r.wishlists.title,
-      ownerId:       r.wishlists.owner_id,
-      ownerName:     r.wishlists.profiles.name,
-      ts:            r.created_at,
-    }))
+  // birthday_approaching: friends with birthdays 1–14 days away, most urgent first
+  // Synthetic ts places these at the top of the feed; urgency determines relative order.
+  const birthdayEvents: ActivityEvent[] = friends
+    .filter(f => f.birthday != null)
+    .flatMap(f => {
+      const daysUntil = getDaysUntilBirthday(f.birthday!, today)
+      if (daysUntil < 1 || daysUntil > 14) return []
+      return [{
+        type:      'birthday_approaching' as const,
+        friendId:  f.id,
+        friendName: f.name,
+        daysUntil,
+        ts: new Date(today.getTime() - (daysUntil - 1) * 86_400_000).toISOString(),
+      }]
+    })
 
   // wishlist_auto_archived: own wishlists archived by cron in last 7 days
   const autoArchivedEvents: ActivityEvent[] = ((autoArchivedResult.data ?? []) as Array<{ id: string; title: string; auto_archived_at: string }>)
@@ -442,7 +431,7 @@ export default async function HomePage() {
     }))
 
   const displayedEvents = [
-    ...newFriendEvents, ...newWishlistEvents, ...newItemEvents,
+    ...birthdayEvents, ...newFriendEvents, ...newWishlistEvents, ...newItemEvents,
     ...reservedItemEvents, ...autoArchivedEvents,
   ]
     .sort((a, b) => b.ts.localeCompare(a.ts))
@@ -531,6 +520,17 @@ export default async function HomePage() {
               <span className="mt-1 feed-bullet" />
               <p className="text-sm leading-snug text-gray-900 dark:text-gray-100">
 
+                {event.type === 'birthday_approaching' && (
+                  event.daysUntil === 1
+                    ? <>{'🎂 Завтра день рождения у '}
+                        <Link href={`/friends/${event.friendId}`} className="font-medium">{event.friendName}</Link>
+                      </>
+                    : <>{'🎂 У '}
+                        <Link href={`/friends/${event.friendId}`} className="font-medium">{event.friendName}</Link>
+                        {` день рождения ${birthdayFeedLabel(event.daysUntil)}`}
+                      </>
+                )}
+
                 {event.type === 'new_friend' && (<>
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName} {event.friendSurname}
@@ -553,7 +553,7 @@ export default async function HomePage() {
                     {event.friendName}
                   </Link>
                   {' добавил желание'}<br />
-                  <span className="font-medium">{event.titles[0]}</span><br />
+                  <span className="font-medium">{event.singleTitle}</span><br />
                   {'в '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
@@ -564,14 +564,11 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
-                  {` добавил ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}<br />
-                  {'в '}
+                  {` добавил ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
+                  {' в '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
                   </Link>
-                  {event.titles.map((t, i) => (
-                    <span key={i}><br />{'• '}{t}</span>
-                  ))}
                 </>)}
 
                 {event.type === 'wishlist_item_reserved' && (<>
@@ -583,16 +580,6 @@ export default async function HomePage() {
                   <span className="text-gray-400">из «{event.wishlistTitle}»</span>
                 </>)}
 
-                {event.type === 'wishlist_access_granted' && (<>
-                  <Link href={`/friends/${event.ownerId}`} className="font-medium">
-                    {event.ownerName}
-                  </Link>
-                  {' добавил вас в приватный вишлист'}<br />
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                </>)}
-
                 {event.type === 'wishlist_auto_archived' && (<>
                   {'Вишлист '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
@@ -601,7 +588,9 @@ export default async function HomePage() {
                   {' был автоматически архивирован'}
                 </>)}
 
-                <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
+                {event.type !== 'birthday_approaching' && (
+                  <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
+                )}
               </p>
               </div>
             </li>
