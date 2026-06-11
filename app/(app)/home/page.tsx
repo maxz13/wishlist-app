@@ -418,7 +418,7 @@ export default async function HomePage() {
     ...reservedItemEvents, ...autoArchivedEvents,
   ]
     .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 4)
+    .slice(0, 20)
 
   const hasActivity = displayedEvents.length > 0
 
@@ -517,7 +517,7 @@ export default async function HomePage() {
 
       {/* Activity feed — directly under page title, no redundant section heading */}
       {hasActivity && (
-        <ul className="mt-4 grouped-card">
+        <ul className={`mt-4 grouped-card${displayedEvents.length > 4 ? ' overflow-y-auto overscroll-contain max-h-[252px]' : ''}`}>
           {displayedEvents.map((event, i) => (
             <li key={i}>
               {i > 0 && (
@@ -551,7 +551,7 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
-                  {' создал вишлист '}
+                  {' создал(а) вишлист '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
                   </Link>
@@ -561,7 +561,7 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
-                  {' добавил желание'}<br />
+                  {' добавил(а) желание'}<br />
                   <span className="font-medium">{event.singleTitle}</span><br />
                   {'в '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
@@ -573,7 +573,7 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
-                  {` добавил ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
+                  {` добавил(а) ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
                   {' в '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
