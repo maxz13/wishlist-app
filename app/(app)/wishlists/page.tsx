@@ -13,7 +13,8 @@ type Wishlist = {
   visibility: string
 }
 
-export default async function WishlistsPage() {
+export default async function WishlistsPage({ searchParams }: { searchParams: Promise<{ create?: string }> }) {
+  const params = await searchParams
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -126,7 +127,7 @@ export default async function WishlistsPage() {
         </ul>
       )}
 
-      <CreateWishlistSection />
+      <CreateWishlistSection autoExpand={params.create === '1'} />
 
       {sharedWishlists.length > 0 && (
         <section className="mt-10">

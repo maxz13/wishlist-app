@@ -53,7 +53,7 @@ export function WishlistTitle({
   }
 
   if (!isOwner) {
-    return <h1 className="mt-3 text-xl font-bold leading-tight">{title}</h1>
+    return <h1 className="text-xl font-bold leading-tight">{title}</h1>
   }
 
   if (editing) {
@@ -66,7 +66,7 @@ export function WishlistTitle({
           z-20 sits above the bottom nav (z-10) and item ⋯ menu overlay (z-10).
         */}
         <div className="fixed inset-0 z-20" onClick={saveDraft} />
-        <div className="relative z-30 mt-3">
+        <div className="relative z-30">
           <input
             autoFocus
             type="text"
@@ -82,14 +82,12 @@ export function WishlistTitle({
   }
 
   return (
-    <div className="mt-3">
-      <button
-        type="button"
-        onClick={enterEdit}
-        className="block w-full text-left text-xl font-bold leading-tight text-gray-900 dark:text-gray-100"
-      >
-        {displayedTitle}
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={enterEdit}
+      className="block text-left text-xl font-bold leading-tight text-gray-900 dark:text-gray-100"
+    >
+      {displayedTitle}
+    </button>
   )
 }

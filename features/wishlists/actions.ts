@@ -6,11 +6,12 @@ import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const CreateWishlistSchema = z.object({
-  title: z.string().min(1, 'Введите название').trim(),
+  title:      z.string().min(1, 'Введите название').trim(),
+  visibility: z.enum(['all_friends', 'private']),
 })
 
 export type CreateWishlistState =
-  | { errors?: { title?: string[] }; message?: string; success?: boolean }
+  | { errors?: { title?: string[]; expires_on?: string[] }; message?: string; success?: boolean }
   | undefined
 
 export async function createWishlistAction(
@@ -18,11 +19,34 @@ export async function createWishlistAction(
   formData: FormData
 ): Promise<CreateWishlistState> {
   const validated = CreateWishlistSchema.safeParse({
-    title: formData.get('title'),
+    title:      formData.get('title'),
+    visibility: formData.get('visibility'),
   })
 
   if (!validated.success) {
     return { errors: validated.error.flatten().fieldErrors }
+  }
+
+  const rawDate = (formData.get('expires_on') as string)?.trim() || ''
+  let expiresOn: string | null = null
+  if (rawDate) {
+    const match = rawDate.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+    if (!match) {
+      return { errors: { expires_on: ['Введите дату в формате ДД.ММ.ГГГГ'] } }
+    }
+    const [, dd, mm, yyyy] = match
+    const date = new Date(`${yyyy}-${mm}-${dd}`)
+    if (isNaN(date.getTime())) {
+      return { errors: { expires_on: ['Неверная дата'] } }
+    }
+    const todayUtc = new Date().toISOString().slice(0, 10)
+    if (`${yyyy}-${mm}-${dd}` < todayUtc) {
+      return { errors: { expires_on: ['Дата не может быть в прошлом'] } }
+    }
+    if (parseInt(yyyy, 10) > 2099) {
+      return { errors: { expires_on: ['Слишком оптимистично, укажите реальный срок'] } }
+    }
+    expiresOn = `${yyyy}-${mm}-${dd}`
   }
 
   const supabase = await createServerSupabaseClient()
@@ -34,9 +58,12 @@ export async function createWishlistAction(
     return { message: 'Не авторизован' }
   }
 
-  const { error } = await supabase
-    .from('wishlists')
-    .insert({ title: validated.data.title, owner_id: user.id })
+  const { error } = await supabase.from('wishlists').insert({
+    title:      validated.data.title,
+    owner_id:   user.id,
+    visibility: validated.data.visibility,
+    expires_on: expiresOn,
+  })
 
   if (error) {
     return { message: 'Не удалось создать вишлист. Попробуйте ещё раз.' }
@@ -388,6 +415,43 @@ export async function deleteWishlistAction(
 
   if (error) return { error: 'Не удалось удалить. Попробуйте ещё раз.' }
 
+  revalidatePath('/wishlists')
+  revalidatePath('/home')
+  return {}
+}
+
+export async function updateWishlistExpirationAction(
+  wishlistId: string,
+  rawDate: string
+): Promise<{ error?: string }> {
+  let expiresOn: string | null = null
+  const trimmed = rawDate.trim()
+  if (trimmed) {
+    const match = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})$/)
+    if (!match) return { error: 'Введите дату в формате ДД.ММ.ГГГГ' }
+    const [, dd, mm, yyyy] = match
+    const date = new Date(`${yyyy}-${mm}-${dd}`)
+    if (isNaN(date.getTime())) return { error: 'Неверная дата' }
+    const dateStr = `${yyyy}-${mm}-${dd}`
+    const todayUtc = new Date().toISOString().slice(0, 10)
+    if (dateStr < todayUtc) return { error: 'Дата не может быть в прошлом' }
+    if (parseInt(yyyy, 10) > 2099) return { error: 'Слишком оптимистично, укажите реальный срок' }
+    expiresOn = dateStr
+  }
+
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const { error } = await supabase
+    .from('wishlists')
+    .update({ expires_on: expiresOn })
+    .eq('id', wishlistId)
+    .eq('owner_id', user.id)
+
+  if (error) return { error: 'Не удалось сохранить. Попробуйте ещё раз.' }
+
+  revalidatePath(`/wishlists/${wishlistId}`)
   revalidatePath('/wishlists')
   revalidatePath('/home')
   return {}

@@ -11,6 +11,7 @@ import {
 import { leaveWishlistAction } from '@/features/wishlists/actions'
 import { MarkWishlistSeenEffect } from '@/features/wishlists/mark-seen-effect'
 import { WishlistTitle } from '@/features/wishlists/wishlist-title'
+import { WishlistExpiration } from '@/features/wishlists/wishlist-expiration'
 import {
   WishlistAccessSection,
   type WishlistVisibility,
@@ -41,7 +42,7 @@ export default async function WishlistDetailPage({
 
   const { data: wishlist } = await supabase
     .from('wishlists')
-    .select('id, title, owner_id, is_archived, visibility')
+    .select('id, title, owner_id, is_archived, visibility, expires_on')
     .eq('id', id)
     .single()
 
@@ -142,7 +143,16 @@ export default async function WishlistDetailPage({
         ‹ Назад
       </Link>
 
-      <WishlistTitle wishlistId={id} title={wishlist.title} isOwner={isOwner} />
+      <div className="mt-3">
+        <WishlistTitle wishlistId={id} title={wishlist.title} isOwner={isOwner} />
+        <div className="mt-1">
+          <WishlistExpiration
+            wishlistId={id}
+            expiresOn={(wishlist as { expires_on?: string | null }).expires_on ?? null}
+            isOwner={isOwner}
+          />
+        </div>
+      </div>
 
       <div className="mt-5">
         {isOwner && (

@@ -64,6 +64,7 @@ type ActivityEvent =
   | { type: 'new_items';                count: number; singleTitle: string | null; titles: string[]; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
   | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; wishlistId: string; wishlistTitle: string; label: string; ts: string }
   | { type: 'wishlist_access_granted';  wishlistId: string; wishlistTitle: string; ownerId: string; ownerName: string; ts: string }
+  | { type: 'wishlist_auto_archived';   wishlistId: string; wishlistTitle: string; ts: string }
 
 const RESERVED_LABELS = [
   'Кто-то планирует подарить',
@@ -118,6 +119,7 @@ export default async function HomePage() {
     newReservationsResult,
     accessGrantedResult,
     recommendationsResult,
+    autoArchivedResult,
   ] = await Promise.all([
     supabase
       .from('friendships')
@@ -158,6 +160,14 @@ export default async function HomePage() {
       .order('created_at', { ascending: false })
       .limit(50),
     supabase.rpc('get_friend_recommendations', { p_limit: 8 }),
+    supabase
+      .from('wishlists')
+      .select('id, title, auto_archived_at')
+      .eq('owner_id', user!.id)
+      .not('auto_archived_at', 'is', null)
+      .gte('auto_archived_at', sevenDaysAgo)
+      .order('auto_archived_at', { ascending: false })
+      .limit(10),
   ])
 
   // Derive IDs from Round 1 results
@@ -408,7 +418,19 @@ export default async function HomePage() {
       ts:            r.created_at,
     }))
 
-  const displayedEvents = [...newFriendEvents, ...newWishlistEvents, ...newItemEvents, ...reservedItemEvents]
+  // wishlist_auto_archived: own wishlists archived by cron in last 7 days
+  const autoArchivedEvents: ActivityEvent[] = ((autoArchivedResult.data ?? []) as Array<{ id: string; title: string; auto_archived_at: string }>)
+    .map((w) => ({
+      type:          'wishlist_auto_archived' as const,
+      wishlistId:    w.id,
+      wishlistTitle: w.title,
+      ts:            w.auto_archived_at,
+    }))
+
+  const displayedEvents = [
+    ...newFriendEvents, ...newWishlistEvents, ...newItemEvents,
+    ...reservedItemEvents, ...autoArchivedEvents,
+  ]
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 4)
 
@@ -554,6 +576,14 @@ export default async function HomePage() {
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
                   </Link>
+                </>)}
+
+                {event.type === 'wishlist_auto_archived' && (<>
+                  {'Вишлист '}
+                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
+                    «{event.wishlistTitle}»
+                  </Link>
+                  {' был автоматически архивирован'}
                 </>)}
 
                 <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
