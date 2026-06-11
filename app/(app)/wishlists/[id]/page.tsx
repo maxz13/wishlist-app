@@ -30,10 +30,10 @@ export default async function WishlistDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ fromFriend?: string }>
+  searchParams: Promise<{ fromFriend?: string; guide?: string }>
 }) {
   const { id } = await params
-  const { fromFriend } = await searchParams
+  const { fromFriend, guide } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -150,6 +150,7 @@ export default async function WishlistDetailPage({
             wishlistId={id}
             expiresOn={(wishlist as { expires_on?: string | null }).expires_on ?? null}
             isOwner={isOwner}
+            showGuide={isOwner && guide === 'expiration'}
           />
         </div>
       </div>

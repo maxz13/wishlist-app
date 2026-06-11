@@ -193,3 +193,14 @@ export async function removeAvatarAction(): Promise<{ error?: string }> {
   revalidatePath('/home')
   return {}
 }
+
+export async function dismissExpirationGuideAction(): Promise<void> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase
+    .from('profiles')
+    .update({ wishlist_expiration_guide_completed_at: new Date().toISOString() })
+    .eq('id', user.id)
+  revalidatePath('/home')
+}

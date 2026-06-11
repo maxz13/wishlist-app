@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateWishlistExpirationAction } from './actions'
+import { dismissExpirationGuideAction } from '@/features/profile/actions'
 
 function isoToDisplay(iso: string): string {
   const [yyyy, mm, dd] = iso.split('-')
@@ -12,16 +14,20 @@ export function WishlistExpiration({
   wishlistId,
   expiresOn,
   isOwner,
+  showGuide = false,
 }: {
   wishlistId: string
   expiresOn: string | null
   isOwner: boolean
+  showGuide?: boolean
 }) {
-  const [liveDate,  setLiveDate]  = useState<string | null>(expiresOn)
-  const [editing,   setEditing]   = useState(false)
-  const [value,     setValue]     = useState(expiresOn ? isoToDisplay(expiresOn) : '')
-  const [error,     setError]     = useState<string | null>(null)
+  const [liveDate,    setLiveDate]    = useState<string | null>(expiresOn)
+  const [editing,     setEditing]     = useState(false)
+  const [value,       setValue]       = useState(expiresOn ? isoToDisplay(expiresOn) : '')
+  const [error,       setError]       = useState<string | null>(null)
+  const [guideActive, setGuideActive] = useState(showGuide)
   const [, startTransition] = useTransition()
+  const router = useRouter()
 
   const inputRef      = useRef<HTMLInputElement>(null)
   const startFreshRef = useRef(false)
@@ -47,6 +53,11 @@ export function WishlistExpiration({
     setValue(liveDate ? isoToDisplay(liveDate) : '')
     setError(null)
     setEditing(true)
+    if (guideActive) {
+      setGuideActive(false)
+      startTransition(() => dismissExpirationGuideAction())
+      router.replace(`/wishlists/${wishlistId}`)
+    }
   }
 
   function cancel() {
@@ -133,7 +144,7 @@ export function WishlistExpiration({
   if (editing) {
     return (
       <div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <input
             ref={inputRef}
             type="text"
@@ -162,6 +173,23 @@ export function WishlistExpiration({
           </button>
         </div>
         {error && <p className="mt-0.5 text-[10px] leading-tight text-red-600">{error}</p>}
+      </div>
+    )
+  }
+
+  if (guideActive) {
+    return (
+      <div className="inline-block rounded-lg bg-blue-50 px-2 py-1.5 dark:bg-blue-950/40">
+        <button
+          type="button"
+          onClick={enterEdit}
+          className="text-xs text-gray-400"
+        >
+          {displayLabel}
+        </button>
+        <p className="mt-0.5 text-[11px] text-[#3b82f6]">
+          Нажмите на срок, чтобы изменить его
+        </p>
       </div>
     )
   }

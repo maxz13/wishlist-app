@@ -5,10 +5,11 @@ import { pluralRu, friendBirthdayLine } from '@/lib/format'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
+import { ExpirationGuideCard } from '@/features/wishlists/expiration-guide-card'
 
 type Friend        = { id: string; name: string; surname: string; birthday: string | null; avatar_url: string | null }
 type Friendship    = { friend_id: string; created_at: string }
-type Wishlist      = { id: string; title: string }
+type Wishlist      = { id: string; title: string; expires_on: string | null }
 type ReservationRow = {
   reservationId: string
   itemTitle: string
@@ -120,6 +121,7 @@ export default async function HomePage() {
     accessGrantedResult,
     recommendationsResult,
     autoArchivedResult,
+    profileFlagsResult,
   ] = await Promise.all([
     supabase
       .from('friendships')
@@ -130,7 +132,7 @@ export default async function HomePage() {
       .eq('to_user_id', user!.id),
     supabase
       .from('wishlists')
-      .select('id, title')
+      .select('id, title, expires_on')
       .eq('owner_id', user!.id)
       .eq('is_archived', false)
       .order('created_at', { ascending: false }),
@@ -168,6 +170,11 @@ export default async function HomePage() {
       .gte('auto_archived_at', sevenDaysAgo)
       .order('auto_archived_at', { ascending: false })
       .limit(10),
+    supabase
+      .from('profiles')
+      .select('wishlist_expiration_guide_completed_at')
+      .eq('id', user!.id)
+      .single(),
   ])
 
   // Derive IDs from Round 1 results
@@ -176,6 +183,12 @@ export default async function HomePage() {
   const rawRequests    = (requestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
   const wishlists      = (wishlistsResult.data ?? []) as Wishlist[]
   const myReservations = (myReservationsResult.data ?? []) as Array<{ id: string; wishlist_item_id: string }>
+
+  const profileFlags          = profileFlagsResult.data as { wishlist_expiration_guide_completed_at: string | null } | null
+  const guidePending          = !profileFlags?.wishlist_expiration_guide_completed_at
+  const wishlistsWithoutExpiry = wishlists.filter(w => !w.expires_on)
+  const showGuideCard         = guidePending && wishlistsWithoutExpiry.length > 0
+  const firstGuideWishlistId  = wishlistsWithoutExpiry[0]?.id ?? null
 
   type RecommendationRow = {
     id: string; name: string; surname: string
@@ -501,6 +514,10 @@ export default async function HomePage() {
       <h1 className="text-xl font-semibold">Лента</h1>
 
       <IncomingRequestsSection requests={incomingRequestsList} />
+
+      {showGuideCard && firstGuideWishlistId != null && (
+        <ExpirationGuideCard firstWishlistId={firstGuideWishlistId} />
+      )}
 
       {/* Activity feed — directly under page title, no redundant section heading */}
       {hasActivity && (

@@ -135,6 +135,20 @@ On iOS: implement as compact inline option rows below the title input, using the
 
 ---
 
+## Wishlist Expiration Onboarding
+
+- A one-time in-app education card ("Теперь у вишлистов есть срок") appears on the Home feed for users who have not yet set an expiration on any active wishlist.
+- Dismiss (×) sets `profiles.wishlist_expiration_guide_completed_at`; the card never reappears. CTA navigates to the first eligible wishlist detail page with `?guide=expiration`.
+- On the detail page, `?guide=expiration` activates a soft blue highlight on the expiration field with the hint "Нажмите на срок, чтобы изменить его". Tapping the highlight enters edit mode, dismisses the guide server-side, and strips the param from the URL.
+
+On iOS:
+- Implement the same one-time flag pattern using `profiles.wishlist_expiration_guide_completed_at`. Fetch it in the initial user profile load.
+- The Home card maps directly to a `UIView` / SwiftUI card in the feed — same dismiss and CTA behaviour.
+- For the detail-page highlight: use a pulsing ring or background fill on the expiration row. Tapping opens the edit field, marks the guide complete (PATCH profile), and removes the highlight.
+- Do not re-implement the `?guide=expiration` URL param approach on iOS — use a persistent app state flag driven by the profile column instead.
+
+---
+
 ## Cross-Route Focus and Keyboard Handling
 
 - **Web limitation:** iOS Safari only opens the software keyboard when `focus()` is called synchronously within a trusted user gesture handler. After client-side route navigation (which is async), `autoFocus` and imperative `.focus()` calls land outside the gesture window — the keyboard may not open automatically on the first navigation.
