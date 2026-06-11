@@ -56,7 +56,7 @@ export default async function AppLayout({
 
   return (
     <div className="fixed inset-0">
-      <header className="absolute top-0 left-0 right-0 z-10 flex items-center bg-white/40 dark:bg-[#1c1c1e]/40 backdrop-blur-md px-4 py-3">
+      <header className="absolute top-0 left-0 right-0 z-10 flex items-center bg-white/20 dark:bg-[#1c1c1e]/20 backdrop-blur-sm px-4 py-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {profile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element

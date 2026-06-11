@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { pluralRu, friendBirthdayLine, getDaysUntilBirthday, birthdayFeedLabel } from '@/lib/format'
+import { pluralRu, friendBirthdayLine, getDaysUntilBirthday } from '@/lib/format'
+import { FeedList } from './feed-list'
+import type { ActivityEvent } from './feed-list'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
@@ -48,13 +50,6 @@ type ReservedActivityRow = {
     wishlists: { id: string; owner_id: string; title: string; is_archived: boolean; visibility: string }
   }
 }
-type ActivityEvent =
-  | { type: 'birthday_approaching';     friendId: string; friendName: string; daysUntil: number; ts: string }
-  | { type: 'new_friend';               friendId: string; friendName: string; friendSurname: string; ts: string }
-  | { type: 'new_wishlist';             wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_items';                count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'wishlist_item_reserved';   itemId: string; itemTitle: string; wishlistId: string; wishlistTitle: string; label: string; ts: string }
-  | { type: 'wishlist_auto_archived';   wishlistId: string; wishlistTitle: string; ts: string }
 
 const RESERVED_LABELS = [
   'Кто-то планирует подарить',
@@ -68,20 +63,6 @@ function reservedLabel(id: string): string {
   return RESERVED_LABELS[sum % RESERVED_LABELS.length]
 }
 
-// ---- helpers ----------------------------------------------------------------
-
-
-function relativeTime(isoString: string): string {
-  const diff  = Date.now() - new Date(isoString).getTime()
-  const mins  = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days  = Math.floor(diff / 86_400_000)
-  if (mins  < 1)   return 'только что'
-  if (mins  < 60)  return `${mins} мин`
-  if (hours < 24)  return `${hours} ч`
-  if (days  === 1) return 'вчера'
-  return `${days} ${pluralRu(days, 'день', 'дня', 'дней')}`
-}
 
 
 // ---- page -------------------------------------------------------------------
@@ -333,7 +314,7 @@ export default async function HomePage() {
     })
 
   // new_wishlist: one event per wishlist created by a friend
-  const newWishlistEvents: ActivityEvent[] = newWishlistsRaw.flatMap((w) => {
+  const newWishlistEvents = newWishlistsRaw.flatMap((w) => {
     const profile = profileById.get(w.owner_id)
     if (!profile) return []
     return [{
@@ -355,7 +336,7 @@ export default async function HomePage() {
     if (!itemGroupMap.has(key)) itemGroupMap.set(key, [])
     itemGroupMap.get(key)!.push(item)
   }
-  const newItemEvents: ActivityEvent[] = Array.from(itemGroupMap.values()).flatMap((group) => {
+  const newItemEvents = Array.from(itemGroupMap.values()).flatMap((group) => {
     const first   = group[0]
     const profile = profileById.get(first.wishlists.owner_id)
     if (!profile) return []
@@ -413,8 +394,31 @@ export default async function HomePage() {
       ts:            w.auto_archived_at,
     }))
 
+  // Merge new_wishlist + new_items for the same wishlistId into one event
+  const itemEventByWishlistId = new Map(newItemEvents.map(e => [e.wishlistId, e]))
+  const mergedWishlistEvents: ActivityEvent[] = []
+  const consumedWishlistIds = new Set<string>()
+  for (const w of newWishlistEvents) {
+    const itemEvent = itemEventByWishlistId.get(w.wishlistId)
+    if (itemEvent) {
+      consumedWishlistIds.add(w.wishlistId)
+      mergedWishlistEvents.push({
+        type:          'new_wishlist_with_items' as const,
+        wishlistId:    w.wishlistId,
+        wishlistTitle: w.wishlistTitle,
+        friendId:      w.friendId,
+        friendName:    w.friendName,
+        count:         itemEvent.count,
+        ts:            w.ts,
+      })
+    } else {
+      mergedWishlistEvents.push(w)
+    }
+  }
+  const remainingItemEvents = newItemEvents.filter(e => !consumedWishlistIds.has(e.wishlistId))
+
   const displayedEvents = [
-    ...birthdayEvents, ...newFriendEvents, ...newWishlistEvents, ...newItemEvents,
+    ...birthdayEvents, ...newFriendEvents, ...mergedWishlistEvents, ...remainingItemEvents,
     ...reservedItemEvents, ...autoArchivedEvents,
   ]
     .sort((a, b) => b.ts.localeCompare(a.ts))
@@ -516,96 +520,7 @@ export default async function HomePage() {
       )}
 
       {/* Activity feed — directly under page title, no redundant section heading */}
-      {hasActivity && (
-        <ul className={`mt-4 grouped-card${displayedEvents.length > 4 ? ' overflow-y-auto overscroll-contain max-h-[252px]' : ''}`}>
-          {displayedEvents.map((event, i) => (
-            <li key={i}>
-              {i > 0 && (
-                <div className="flex justify-center">
-                  <div className="grouped-card-divider" />
-                </div>
-              )}
-              <div className="flex items-start gap-3 px-4 py-3">
-              <span className="mt-1 feed-bullet" />
-              <p className="text-sm leading-snug text-gray-900 dark:text-gray-100">
-
-                {event.type === 'birthday_approaching' && (
-                  event.daysUntil === 1
-                    ? <>{'🎂 Завтра день рождения у '}
-                        <Link href={`/friends/${event.friendId}`} className="font-medium">{event.friendName}</Link>
-                      </>
-                    : <>{'🎂 У '}
-                        <Link href={`/friends/${event.friendId}`} className="font-medium">{event.friendName}</Link>
-                        {` день рождения ${birthdayFeedLabel(event.daysUntil)}`}
-                      </>
-                )}
-
-                {event.type === 'new_friend' && (<>
-                  <Link href={`/friends/${event.friendId}`} className="font-medium">
-                    {event.friendName} {event.friendSurname}
-                  </Link>
-                  {' теперь в друзьях'}
-                </>)}
-
-                {event.type === 'new_wishlist' && (<>
-                  <Link href={`/friends/${event.friendId}`} className="font-medium">
-                    {event.friendName}
-                  </Link>
-                  {' создал(а) вишлист '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                </>)}
-
-                {event.type === 'new_items' && event.count === 1 && (<>
-                  <Link href={`/friends/${event.friendId}`} className="font-medium">
-                    {event.friendName}
-                  </Link>
-                  {' добавил(а) желание'}<br />
-                  <span className="font-medium">{event.singleTitle}</span><br />
-                  {'в '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                </>)}
-
-                {event.type === 'new_items' && event.count > 1 && (<>
-                  <Link href={`/friends/${event.friendId}`} className="font-medium">
-                    {event.friendName}
-                  </Link>
-                  {` добавил(а) ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
-                  {' в '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                </>)}
-
-                {event.type === 'wishlist_item_reserved' && (<>
-                  {'Кто-то выбрал подарок: '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    {event.itemTitle}
-                  </Link>
-                  <br />
-                  <span className="text-gray-400">из «{event.wishlistTitle}»</span>
-                </>)}
-
-                {event.type === 'wishlist_auto_archived' && (<>
-                  {'Вишлист '}
-                  <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
-                    «{event.wishlistTitle}»
-                  </Link>
-                  {' был автоматически архивирован'}
-                </>)}
-
-                {event.type !== 'birthday_approaching' && (
-                  <span className="whitespace-nowrap text-gray-400"> · {relativeTime(event.ts)}</span>
-                )}
-              </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      {hasActivity && <FeedList events={displayedEvents} />}
 
       <div className={`flex flex-col${hasActivity ? ' mt-8 sm:mt-10' : ' mt-4'}`}>
 

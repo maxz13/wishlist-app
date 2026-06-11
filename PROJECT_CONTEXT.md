@@ -24,16 +24,17 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Wishlists: create, edit, archive/restore, per-wishlist visibility control
 - Wishlist items: add, inline edit (title/price/link), reserve, reservation owner visibility
 - Birthday collection at registration
-- Bottom navigation: icon + label tabs, active state; nav height 74px; icon containers 28×28; SVG icons 23×23; central `+` button 64×64 (blue circle, raised `-mt-[18px]`); profile tab shows avatar photo (circular, 28×28, blue border ring when active) or initials badge; green dot (bottom-right of Friends icon) when pending incoming requests > 0; no top border; background `#fafafa`
-- Home feed ("Лента"): incoming friend requests section (compact horizontal card: avatar + name/username + green Принять + red Отклонить) rendered above activity stream; activity stream (top 4 events) + Друзья · Я подарю sections. "Мои вишлисты" section removed 2026-06-11; own wishlists accessible via Wishlists tab.
+- Bottom navigation: icon + label tabs, active state; nav height 74px; icon containers 28×28; SVG icons 23×23; central `+` button 64×64 (blue circle, raised `-mt-[18px]`); profile tab shows avatar photo (circular, 28×28, blue border ring when active) or initials badge; green dot (bottom-right of Friends icon) when pending incoming requests > 0; no top border; background `#fafafa`; tab icon `strokeWidth="2"` (HomeIcon/UsersIcon/ListIcon), PlusIcon `strokeWidth="2.5"` unchanged; glass: `bg-[#fafafa]/20 dark:bg-[#111111]/20 backdrop-blur-sm`
+- Home feed ("Лента"): incoming friend requests section (compact horizontal card: avatar + name/username + green Принять + red Отклонить) rendered above activity stream; activity stream (cap 20, scrollable viewport ~4.5 events) + Друзья · Я подарю sections. "Мои вишлисты" section removed 2026-06-11; own wishlists accessible via Wishlists tab.
 - Activity feed events (last 14 days, top 4 by ts, relative timestamps, entities clickable):
   - `birthday_approaching` — friend's birthday 1–14 days away; synthetic ts (today − (daysUntil−1) days) positions by urgency; labels: daysUntil=1 "Завтра", 2–3 "через N дней", 4–7 "через неделю", 8–14 "через 2 недели"
   - `new_friend` — friendship formed
-  - `new_wishlist` — friend created an all_friends wishlist
-  - `new_items` — friend added visible items to an all_friends wishlist; grouped by (owner_id, wishlist_id) across the full window (not per-day); count=1 shows item title, count>1 shows count only
+  - `new_wishlist` — friend created an all_friends wishlist (no items added in same window)
+  - `new_wishlist_with_items` — friend created an all_friends wishlist AND added items in the same 14-day window; merged from matching `new_wishlist` + `new_items` events for the same `wishlistId`; replaces both in the feed
+  - `new_items` — friend added visible items to an all_friends wishlist (existing wishlist only); grouped by (owner_id, wishlist_id) across the full window (not per-day); count=1 shows item title, count>1 shows count only
   - `wishlist_item_reserved` — someone reserved one of the owner's items; random label from 4 variants; two-line format
   - `wishlist_auto_archived` — own wishlist auto-archived by cron
-  - Wrapped in `.grouped-card` with `.feed-bullet` per row and `.grouped-card-divider` between rows
+  - Rendered by `FeedList` client component (`app/(app)/home/feed-list.tsx`); no outer card, no inter-row dividers; `.feed-bullet` per row; bottom gradient fade; scrollable when >4 events (measured 4.5-row viewport via `getBoundingClientRect`/`ResizeObserver`/`document.fonts.ready`); capped at 20 events
 - Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); two-mode friend search — default searches 2nd + 3rd-degree social graph only (`search_social_graph` RPC); "Искать дальше" button triggers full profiles search (`search_global` RPC, excludes already-shown IDs); 2-char threshold, 300ms debounce, browser Supabase client; placeholder "Имя или @никнейм"; matches username / name / surname / transliteration in both directions (Latin query → `transliterate_ru(p.name/surname)`; Cyrillic query → `transliterate_ru(lower(p_prefix))` vs Latin fields); global results in separate card under "Другие пользователи"; search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />`: card with 🎁 emoji, "Скопировать" + "Поделиться" pill buttons, invite URL pre-generated on mount, formatted message with sender's first name
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
 - My Wishlists section (Home): `.grouped-card`, title + item count below, numeric count before `›`, full-width dividers
@@ -69,6 +70,17 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 ---
 
 ## Current focus
+
+Session 2026-06-12. Home/feed/nav polish deployed to production on `main`.
+
+Feed + nav polish (2026-06-12):
+- `FeedList` client component extracted (`app/(app)/home/feed-list.tsx`): scrollable feed, measured 4.5-row viewport, `ResizeObserver`, `document.fonts.ready` for font timing, bottom gradient fade, cap 20 events
+- `new_wishlist_with_items` event type: `new_wishlist` + `new_items` for same `wishlistId` merged into one event; consumed `new_items` excluded from remaining events
+- Feed visual: removed `.grouped-card` wrapper, removed inter-row dividers, width adjusted to `mx-3`, `.feed-bullet` reduced 8px → 6px
+- Feed typography: non-breaking spaces (` `) in numeric+unit phrases and relative time labels; gender-neutral verbs (`добавил(а)`, `создал(а)`)
+- "Мои вишлисты" section removed from Home; "Создать первый вишлист" CTA preserved for users with no wishlists; `itemCountsResult` Round 2 query removed (Round 2 now 6 queries)
+- Bottom nav icon `strokeWidth`: 1.75 → 2 for HomeIcon/UsersIcon/ListIcon; PlusIcon remains 2.5
+- Header/nav glass tuning: opacity `/40` → `/20`, blur `backdrop-blur-md` → `backdrop-blur-sm`; finding: on near-white backgrounds, `backdrop-blur` visually dominates — changing opacity alone has no perceptible effect; both must be tuned together
 
 Session 2026-06-11. Home UI polish deployed to production on `main`.
 
@@ -118,8 +130,8 @@ Session 2026-06-11. Social discovery polish + glass navigation deployed to produ
 
 Visual polish (2026-06-11):
 - Recommendation dismiss button softened: `opacity-75` added to `bg-red-500` button in `RecommendationsSection` — keeps red signal, reduces visual intensity
-- Glass header: `app/(app)/layout.tsx` header changed from opaque `bg-white` to `bg-white/40 dark:bg-[#1c1c1e]/40 backdrop-blur-md`; positioned `absolute top-0 left-0 right-0 z-10` (overlays scrollable content)
-- Glass bottom nav: `app/(app)/bottom-nav.tsx` nav changed from opaque `bg-[#fafafa]` to `bg-[#fafafa]/40 dark:bg-[#111111]/40 backdrop-blur-md`; positioned `absolute bottom-0 left-0 right-0 z-10`
+- Glass header: `app/(app)/layout.tsx` header changed from opaque `bg-white` to `bg-white/20 dark:bg-[#1c1c1e]/20 backdrop-blur-sm`; positioned `absolute top-0 left-0 right-0 z-10` (overlays scrollable content) — later tuned from `/40 backdrop-blur-md` to `/20 backdrop-blur-sm` (2026-06-12)
+- Glass bottom nav: `app/(app)/bottom-nav.tsx` nav changed from opaque `bg-[#fafafa]` to `bg-[#fafafa]/20 dark:bg-[#111111]/20 backdrop-blur-sm`; positioned `absolute bottom-0 left-0 right-0 z-10` — later tuned from `/40 backdrop-blur-md` (2026-06-12)
 - Shell layout: outer wrapper `fixed inset-0 flex flex-col` → `fixed inset-0`; content div `flex-1 overflow-y-auto overscroll-y-contain` → `absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content`
 - `.app-scroll-content` utility added to `app/globals.css`: `padding-bottom: calc(74px + env(safe-area-inset-bottom))` — ensures last content item clears the overlaying nav on all devices including notch iPhones
 - Content now scrolls underneath translucent header and bottom nav, producing a real frosted-glass effect on iOS Safari/PWA (tested on device)
@@ -321,7 +333,7 @@ Remaining work:
 
 ## Important technical decisions
 
-- **App shell architecture:** `app/(app)/layout.tsx` renders `<div className="fixed inset-0">` — fixes iOS Safari viewport bugs where document-level scroll caused the header and bottom nav to detach during rubber-band overscroll. Structure: header `absolute top-0 left-0 right-0 z-10` overlays content, content area `absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content` (only this div scrolls), `<BottomNav>` `absolute bottom-0 left-0 right-0 z-10` overlays content. Header and nav use `bg-*/40 backdrop-blur-md` for a glass effect — content scrolls visibly underneath them. Supporting rules: `html, body { overscroll-behavior: none }` in `globals.css`; `viewportFit: "cover"` in root layout viewport export; `pb-[env(safe-area-inset-bottom)]` on nav; `.app-scroll-content` provides `padding-bottom: calc(74px + env(safe-area-inset-bottom))`. Do not revert to document-level scrolling without approval. Do not revert to flex-col stacking without approval.
+- **App shell architecture:** `app/(app)/layout.tsx` renders `<div className="fixed inset-0">` — fixes iOS Safari viewport bugs where document-level scroll caused the header and bottom nav to detach during rubber-band overscroll. Structure: header `absolute top-0 left-0 right-0 z-10` overlays content, content area `absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content` (only this div scrolls), `<BottomNav>` `absolute bottom-0 left-0 right-0 z-10` overlays content. Header and nav use `bg-*/20 backdrop-blur-sm` for a glass effect — content scrolls visibly underneath them. Important: on near-white (`#fafafa`) backgrounds `backdrop-blur` dominates visually; changing background-color opacity alone has no perceptible effect — tune both blur strength and opacity together. Gradient overlays inside/adjacent to `<BottomNav>` risk visual artifacts above the `+` button due to absolute-positioning layer conflicts. Supporting rules: `html, body { overscroll-behavior: none }` in `globals.css`; `viewportFit: "cover"` in root layout viewport export; `pb-[env(safe-area-inset-bottom)]` on nav; `.app-scroll-content` provides `padding-bottom: calc(74px + env(safe-area-inset-bottom))`. Do not revert to document-level scrolling without approval. Do not revert to flex-col stacking without approval.
 - **Wishlist title inline rename:** `WishlistTitle` client component (`features/wishlists/wishlist-title.tsx`). State: `isEditing` boolean + `displayedTitle` string for optimistic display. Tap title → `isEditing = true`, title replaced with `<input autoFocus>`; Enter or `onBlur` → call `updateWishlistTitleAction`, set `displayedTitle` immediately (optimistic), revert on error; Escape → cancel, restore original. Server action not called if trimmed new value equals current title. Revalidates `/wishlists` and `/home` on save.
 - **Tailwind v4 blue bug:** `bg-blue-500` does not render. Use `bg-[#3b82f6]`. `text-blue-500` works fine.
 - **Tailwind v4 arbitrary class reliability:** Multi-value shadows and some dimension utilities unreliable in dev. Prefer named CSS classes in `app/globals.css`.
@@ -336,7 +348,7 @@ Remaining work:
 - **Username is immutable after registration.** CHECK: `^[a-z][a-z0-9_]{1,28}[a-z0-9]$`, no `__`. Min 3 chars.
 - **Username auto-generation:** `generate_username(name, surname)` DB function. Mirrored in `register-form.tsx` (`buildUsernamePreview`) — keep in sync.
 - **Activity feed grouping:** `new_items` group by `(owner_id, wishlist_id)` in JS — one event per wishlist across the full 14-day rolling window (not per calendar day).
-- **Activity feed event types:** `birthday_approaching`, `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_auto_archived`. All computed at query time from existing tables — no events table. `wishlist_auto_archived` queries the current user's own wishlists where `auto_archived_at IS NOT NULL AND >= fourteenDaysAgo`. `wishlist_access_granted` was removed from the feed on 2026-06-05 (leaks private wishlist names).
+- **Activity feed event types:** `birthday_approaching`, `new_friend`, `new_wishlist`, `new_wishlist_with_items`, `new_items`, `wishlist_item_reserved`, `wishlist_auto_archived`. All computed at query time from existing tables — no events table. `new_wishlist_with_items` is a client-side merge: for each `new_wishlist` event, if a `new_items` event exists for the same `wishlistId`, both are collapsed into one `new_wishlist_with_items` event (consumed `new_items` removed from remaining events). `wishlist_auto_archived` queries the current user's own wishlists where `auto_archived_at IS NOT NULL AND >= fourteenDaysAgo`. `wishlist_access_granted` was removed from the feed on 2026-06-05 (leaks private wishlist names).
 - **`wishlist_item_reserved` label:** deterministic from reservation UUID char-code sum mod 4 — same event always shows same text across renders.
 - **`wishlist_access_granted` feed event:** REMOVED from feed (2026-06-05). All `wishlist_access` entries are `selected_friends` by definition — showing them in the feed leaks private wishlist names.
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.

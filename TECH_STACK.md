@@ -377,3 +377,17 @@ Avoid:
 # Final Principle
 
 Build the simplest production-quality architecture that can support the product vision cleanly and safely.
+
+---
+
+# UI Implementation Notes
+
+## Translucent header and nav — backdrop-blur behavior
+
+On near-white backgrounds (`#fafafa`, `#ffffff`), `backdrop-blur` visually dominates the frosted-glass effect. Changing background-color opacity alone (e.g., `/40` → `/10`) has no perceptible visual effect because the blurred content and the overlay color are nearly identical.
+
+**Rule:** tune blur strength AND opacity together. Current glass values: `backdrop-blur-sm` + 20% opacity (`bg-*/20`).
+
+## Gradient overlays near BottomNav
+
+Avoid absolutely-positioned gradient divs inside or adjacent to `<BottomNav>`. They can create visual artifacts above the central `+` button due to CSS layer stacking conflicts with the absolute-positioned nav. If a fade is needed at the nav edge, place it inside the scrollable content container (not as a sibling of the nav in the shell).

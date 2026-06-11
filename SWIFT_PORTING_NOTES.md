@@ -117,8 +117,9 @@ On iOS:
 |---|---|---|---|
 | `birthday_approaching` | `profiles.birthday` of friends | 1–14 days until next birthday | "Послезавтра день рождения у {Name}" / "Через неделю…" / "Через 2 недели…" |
 | `new_friend` | `friendships.created_at` | Last 14 days | "{Name} {Surname} теперь ваш друг" |
-| `new_wishlist` | `wishlists.created_at` | Last 14 days; `all_friends` visibility; not archived | "{Name} создал вишлист «{title}»" |
-| `new_items` | `wishlist_items.created_at` | Last 14 days; `all_friends` wishlist; `is_visible=true` | "{Name} добавил желание / {title} / в «{wishlist}»" (count=1) or "{Name} добавил N желаний / в «{wishlist}»" (count>1) |
+| `new_wishlist` | `wishlists.created_at` | Last 14 days; `all_friends` visibility; not archived; no matching `new_items` for same wishlistId | "{Name} создал(а) вишлист «{title}»" |
+| `new_wishlist_with_items` | client-side merge of `new_wishlist` + `new_items` | Same wishlistId match in same 14-day window | "{Name} создал(а) вишлист «{title}» и добавил(а) N желаний" |
+| `new_items` | `wishlist_items.created_at` | Last 14 days; `all_friends` wishlist; `is_visible=true`; no matching `new_wishlist` for same wishlistId | "{Name} добавил(а) желание / {title} / в «{wishlist}»" (count=1) or "{Name} добавил(а) N желаний / в «{wishlist}»" (count>1) |
 | `wishlist_item_reserved` | `reservations.created_at` | Last 14 days; own wishlists only | Random label from 4 variants; "из «{wishlist}»" second line |
 | `wishlist_auto_archived` | `wishlists.auto_archived_at` | Last 14 days; own wishlists | "Вишлист «{title}» завершён" |
 
@@ -130,7 +131,7 @@ On iOS:
 ### Sort + cap
 
 - All event types merged and sorted descending by `ts` (ISO string comparison).
-- Top 4 events displayed. If more than 4 exist, older ones are hidden.
+- Up to 20 events loaded; displayed in a scrollable list with a measured 4.5-event viewport (4 full rows + half of the 5th). On iOS, implement as a `UIScrollView` with a fixed height calculated from row heights — do not hardcode pixel values.
 - `birthday_approaching` uses a **synthetic ts**: `today − (daysUntil − 1) days`. A birthday tomorrow gets ts = today (highest urgency). A birthday 14 days away gets ts = today − 13 days. This ensures birthday urgency is reflected in sort position relative to other feed events.
 
 ### Feeds only show `all_friends` wishlist activity
