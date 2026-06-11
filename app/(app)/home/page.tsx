@@ -83,9 +83,6 @@ function relativeTime(isoString: string): string {
   return `${days} ${pluralRu(days, 'день', 'дня', 'дней')}`
 }
 
-function moreItemsLabel(n: number, one: string, few: string, many: string): string {
-  return `и ещё ${n} ${pluralRu(n, one, few, many)}`
-}
 
 // ---- page -------------------------------------------------------------------
 
@@ -185,7 +182,6 @@ export default async function HomePage() {
   // Round 2: queries that depend on Round 1 IDs — run in parallel
   const [
     senderProfilesResult,
-    itemCountsResult,
     friendProfilesResult,
     friendWishlistsResult,
     newWishlistsResult,
@@ -200,14 +196,6 @@ export default async function HomePage() {
         .from('profiles')
         .select('id, name, surname, username, avatar_url')
         .in('id', senderIds)
-    })(),
-    // Own wishlist item counts (depends on wishlists)
-    (async () => {
-      if (wishlists.length === 0) return { data: [] as Array<{ wishlist_id: string }> }
-      return supabase
-        .from('wishlist_items')
-        .select('wishlist_id')
-        .in('wishlist_id', wishlists.map(w => w.id))
     })(),
     // Friend profiles (depends on friendIds)
     (async () => {
@@ -276,11 +264,6 @@ export default async function HomePage() {
       }
     })
     .filter((r): r is IncomingRequest => r !== null)
-
-  const itemCountMap = new Map<string, number>()
-  for (const row of (itemCountsResult.data ?? [])) {
-    itemCountMap.set(row.wishlist_id, (itemCountMap.get(row.wishlist_id) ?? 0) + 1)
-  }
 
   const friends    = (friendProfilesResult.data ?? []) as Friend[]
   const profileById = new Map(friends.map((f) => [f.id, f]))
@@ -465,10 +448,36 @@ export default async function HomePage() {
   const hasWishlists   = wishlists.length > 0
   const hasReservations = reservationRows.length > 0
 
-  const displayedFriends    = friends.slice(0, 3)
-  const moreFriendsCount    = Math.max(0, friends.length - 3)
-  const displayedWishlists  = wishlists.slice(0, 3)
-  const moreWishlistsCount  = Math.max(0, wishlists.length - 3)
+  // Stable daily friend selection: birthday urgency → recently added → deterministic rotation
+  const dayIndex = Math.floor(Date.now() / 86_400_000)
+  const friendCreatedAtMap = new Map(friendshipRows.map(r => [r.friend_id, r.created_at]))
+
+  const birthdayPriorityFriends = friends
+    .filter(f => f.birthday != null)
+    .map(f => ({ f, daysUntil: getDaysUntilBirthday(f.birthday!, today) }))
+    .filter(({ daysUntil }) => daysUntil >= 1 && daysUntil <= 14)
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .map(({ f }) => f)
+
+  const recentlyAddedFriends = friends
+    .filter(f => (friendCreatedAtMap.get(f.id) ?? '') >= fourteenDaysAgo)
+    .sort((a, b) => (friendCreatedAtMap.get(b.id) ?? '').localeCompare(friendCreatedAtMap.get(a.id) ?? ''))
+
+  const selectedFriends: typeof friends = []
+  const usedFriendIds = new Set<string>()
+  for (const f of [...birthdayPriorityFriends, ...recentlyAddedFriends]) {
+    if (selectedFriends.length >= 3) break
+    if (!usedFriendIds.has(f.id)) { selectedFriends.push(f); usedFriendIds.add(f.id) }
+  }
+  if (selectedFriends.length < 3) {
+    const pool = friends.filter(f => !usedFriendIds.has(f.id))
+    if (pool.length > 0) {
+      const start = dayIndex % pool.length
+      for (let i = 0; i < pool.length && selectedFriends.length < 3; i++) {
+        selectedFriends.push(pool[(start + i) % pool.length])
+      }
+    }
+  }
 
   // State A: nothing to show at all
   if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity && incomingRequestsList.length === 0) {
@@ -542,7 +551,7 @@ export default async function HomePage() {
                   <Link href={`/friends/${event.friendId}`} className="font-medium">
                     {event.friendName}
                   </Link>
-                  {' создал вишлист'}<br />
+                  {' создал вишлист '}
                   <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                     «{event.wishlistTitle}»
                   </Link>
@@ -589,7 +598,7 @@ export default async function HomePage() {
                 </>)}
 
                 {event.type !== 'birthday_approaching' && (
-                  <span className="text-gray-400"> · {relativeTime(event.ts)}</span>
+                  <span className="whitespace-nowrap text-gray-400"> · {relativeTime(event.ts)}</span>
                 )}
               </p>
               </div>
@@ -619,14 +628,15 @@ export default async function HomePage() {
           <section>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="section-title">Друзья</h2>
-              <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
-                Все друзья<span>›</span>
-              </Link>
+              {hasFriends && (
+                <Link href="/friends" className="flex items-center gap-1 text-sm text-gray-500">
+                  Все {friends.length} {pluralRu(friends.length, 'друг', 'друга', 'друзей')}<span>›</span>
+                </Link>
+              )}
             </div>
             {hasFriends ? (
-              <>
-                <ul className="grouped-card">
-                  {displayedFriends.map((friend, i) => {
+              <ul className="grouped-card">
+                  {selectedFriends.map((friend, i) => {
                     const count = friendWishlistCountMap.get(friend.id) ?? 0
                     const itemCount = friendItemCountMap.get(friend.id) ?? 0
                     const mutualCount = mutualCountMap.get(friend.id) ?? 0
@@ -663,13 +673,7 @@ export default async function HomePage() {
                       </li>
                     )
                   })}
-                </ul>
-                {moreFriendsCount > 0 && (
-                  <Link href="/friends" className="mt-2 block py-1 text-sm text-gray-500">
-                    {moreItemsLabel(moreFriendsCount, 'друг', 'друга', 'друзей')}
-                  </Link>
-                )}
-              </>
+              </ul>
             ) : (
               <div className="flex flex-col gap-1.5">
                 <p className="text-sm text-gray-500">У вас пока нет друзей</p>
@@ -677,48 +681,6 @@ export default async function HomePage() {
                   Пригласить друга
                 </Link>
               </div>
-            )}
-          </section>
-        )}
-
-        {/* 2. Мои вишлисты */}
-        {hasWishlists && (
-          <section className="mt-8 sm:mt-10">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="section-title">Мои вишлисты</h2>
-              <Link href="/wishlists" className="flex items-center gap-1 text-sm text-gray-500">
-                См. все<span>›</span>
-              </Link>
-            </div>
-            <ul className="grouped-card">
-              {displayedWishlists.map((w, i) => {
-                const count = itemCountMap.get(w.id) ?? 0
-                return (
-                  <li key={w.id}>
-                    {i > 0 && <div className="row-divider" />}
-                    <Link
-                      href={`/wishlists/${w.id}`}
-                      className="flex items-center justify-between px-4 py-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{w.title}</p>
-                        <p className="text-xs text-gray-400">
-                          {count} {pluralRu(count, 'желание', 'желания', 'желаний')}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1 text-gray-400">
-                        <span className="text-xs">{count}</span>
-                        <span>›</span>
-                      </div>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-            {moreWishlistsCount > 0 && (
-              <Link href="/wishlists" className="mt-2 block py-1 text-sm text-gray-500">
-                {moreItemsLabel(moreWishlistsCount, 'вишлист', 'вишлиста', 'вишлистов')}
-              </Link>
             )}
           </section>
         )}

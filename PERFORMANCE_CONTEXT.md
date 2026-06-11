@@ -95,22 +95,28 @@ the skeleton appears. This is a framework-level constraint without `cacheCompone
 
 **After:** 2 parallel groups + 1 unavoidable sequential tail.
 
-**Round 1** — 7 independent queries, all needing only `user.id`:
+**Round 1** — 9 independent queries, all needing only `user.id`:
 - `friendships`
 - `friend_requests` (incoming)
 - `wishlists` (own active)
 - `reservations` (my own, for "Я подарю")
-- `wishlist_items` (activity: new_items)
+- `wishlist_items` (activity: new_items) — no `profiles!inner`; owner names resolved via profileById in JS
 - `reservations` (activity: reserved on my items)
-- `wishlist_access` (activity: access_granted)
+- `get_friend_recommendations` RPC
+- `wishlists` (activity: auto_archived — own wishlists with `auto_archived_at IS NOT NULL AND >= 14 days`)
+- `profiles` (feature guide flags)
+
+Note: `wishlist_access` query removed (2026-06-05, access_granted event removed from feed).
 
 **Round 2** — 6 conditional queries depending on Round 1 IDs:
 - sender profiles (→ `rawRequests`)
-- own wishlist item counts (→ `wishlists`)
 - friend profiles (→ `friendIds`)
 - friend wishlist counts (→ `friendIds`)
-- activity: new_wishlist (→ `friendIds`)
+- activity: new_wishlist (→ `friendIds`) — no `profiles!inner`; owner names resolved via profileById
 - "Я подарю" reserved items (→ `myReservations`)
+- mutual friend counts RPC (→ `friendIds`)
+
+Note: `own wishlist item counts` query removed 2026-06-11 when "Мои вишлисты" Home section was removed.
 
 **Round 3** — 1 sequential query, unavoidably depends on Round 2:
 - "Я подарю" wishlists (→ `reservedItems`)
@@ -175,7 +181,7 @@ These areas must not be casually modified:
 - **`wishlist_access` table** — access control for `selected_friends` visibility
 - **Reservation visibility** — friends can see who reserved; only owner can see reserver names
 - **Private wishlist visibility** — `visibility = 'private'` must never leak to non-owners
-- **Activity feed semantics** — `new_items` relies on RLS for friend filtering; a missing filter in the query is intentional
+- **Activity feed semantics** — `new_items` relies on RLS for friend filtering; a missing `friendIds` filter in the query is intentional. Neither `new_wishlist` nor `new_items` embed `profiles!inner` — doing so caused PGRST201 ("more than one relationship") due to an ambiguous FK path in PostgREST. Owner names are resolved in JS via the `profileById` Map built from Round 2 `friendProfilesResult`.
 
 Any query touching these areas requires re-reading the RLS migration files
 (`20260603000000_wishlist_visibility.sql`, `20260530000001_profiles_reserver_visibility.sql`)

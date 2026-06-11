@@ -111,6 +111,36 @@ On iOS:
 - Do not design an iOS feed that assumes historical events (e.g., "X unfriended you", "Y left your wishlist") without first building an `activity_log` table. Design within the live-query model, or build the table first.
 - `wishlist_auto_archived` is an event type computed from `wishlists.auto_archived_at IS NOT NULL` for the current user's own wishlists — it is informational, not interactive. On iOS consider a local notification (1 day before expiry) as a complement to the feed entry.
 
+### Active event types (as of 2026-06-11)
+
+| Type | Source | Filter | Copy pattern |
+|---|---|---|---|
+| `birthday_approaching` | `profiles.birthday` of friends | 1–14 days until next birthday | "Послезавтра день рождения у {Name}" / "Через неделю…" / "Через 2 недели…" |
+| `new_friend` | `friendships.created_at` | Last 14 days | "{Name} {Surname} теперь ваш друг" |
+| `new_wishlist` | `wishlists.created_at` | Last 14 days; `all_friends` visibility; not archived | "{Name} создал вишлист «{title}»" |
+| `new_items` | `wishlist_items.created_at` | Last 14 days; `all_friends` wishlist; `is_visible=true` | "{Name} добавил желание / {title} / в «{wishlist}»" (count=1) or "{Name} добавил N желаний / в «{wishlist}»" (count>1) |
+| `wishlist_item_reserved` | `reservations.created_at` | Last 14 days; own wishlists only | Random label from 4 variants; "из «{wishlist}»" second line |
+| `wishlist_auto_archived` | `wishlists.auto_archived_at` | Last 14 days; own wishlists | "Вишлист «{title}» завершён" |
+
+### Grouping rules
+
+- `new_items`: grouped by `(owner_id, wishlist_id)` across the full 14-day window. Multiple adds to the same wishlist collapse to one event. The event ts is the latest item's `created_at` within the group.
+- All other types: one row per raw DB row (no grouping).
+
+### Sort + cap
+
+- All event types merged and sorted descending by `ts` (ISO string comparison).
+- Top 4 events displayed. If more than 4 exist, older ones are hidden.
+- `birthday_approaching` uses a **synthetic ts**: `today − (daysUntil − 1) days`. A birthday tomorrow gets ts = today (highest urgency). A birthday 14 days away gets ts = today − 13 days. This ensures birthday urgency is reflected in sort position relative to other feed events.
+
+### Feeds only show `all_friends` wishlist activity
+
+- `new_wishlist` and `new_items` only appear for wishlists with `visibility = 'all_friends'`. Private and `selected_friends` wishlist activity is intentionally hidden from the feed.
+
+### Avoid `profiles!inner` embedded join
+
+On the web, PostgREST PGRST201 error ("more than one relationship") occurs when embedding `profiles` inside a `wishlists` query, because there are multiple FK paths from `wishlists` to `profiles`. On iOS/Swift, avoid the same pattern in any Supabase query that joins `wishlists → profiles` indirectly. Fetch the wishlist `owner_id` and resolve the owner's name from a separately-fetched profiles dictionary instead.
+
 ---
 
 ## Wishlist Expiration

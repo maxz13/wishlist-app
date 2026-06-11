@@ -25,13 +25,14 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 - Wishlist items: add, inline edit (title/price/link), reserve, reservation owner visibility
 - Birthday collection at registration
 - Bottom navigation: icon + label tabs, active state; nav height 74px; icon containers 28×28; SVG icons 23×23; central `+` button 64×64 (blue circle, raised `-mt-[18px]`); profile tab shows avatar photo (circular, 28×28, blue border ring when active) or initials badge; green dot (bottom-right of Friends icon) when pending incoming requests > 0; no top border; background `#fafafa`
-- Home feed ("Лента"): incoming friend requests section (compact horizontal card: avatar + name/username + green Принять + red Отклонить) rendered above activity stream; activity stream (top 4 events) + Друзья · Мои вишлисты · Я подарю sections.
-- Activity feed events (all last 7 days, relative timestamps, entities clickable):
+- Home feed ("Лента"): incoming friend requests section (compact horizontal card: avatar + name/username + green Принять + red Отклонить) rendered above activity stream; activity stream (top 4 events) + Друзья · Я подарю sections. "Мои вишлисты" section removed 2026-06-11; own wishlists accessible via Wishlists tab.
+- Activity feed events (last 14 days, top 4 by ts, relative timestamps, entities clickable):
+  - `birthday_approaching` — friend's birthday 1–14 days away; synthetic ts (today − (daysUntil−1) days) positions by urgency; labels: daysUntil=1 "Завтра", 2–3 "через N дней", 4–7 "через неделю", 8–14 "через 2 недели"
   - `new_friend` — friendship formed
-  - `new_wishlist` — friend created a wishlist
-  - `new_items` — friend added visible items (grouped by wishlist+day)
+  - `new_wishlist` — friend created an all_friends wishlist
+  - `new_items` — friend added visible items to an all_friends wishlist; grouped by (owner_id, wishlist_id) across the full window (not per-day); count=1 shows item title, count>1 shows count only
   - `wishlist_item_reserved` — someone reserved one of the owner's items; random label from 4 variants; two-line format
-  - `wishlist_access_granted` — a friend added the current user to a private wishlist; two-line format (owner name + wishlist title)
+  - `wishlist_auto_archived` — own wishlist auto-archived by cron
   - Wrapped in `.grouped-card` with `.feed-bullet` per row and `.grouped-card-divider` between rows
 - Friends page (`/friends`): `section-title` h1; incoming requests section (`grouped-card`, accept/decline, optimistic removal); two-mode friend search — default searches 2nd + 3rd-degree social graph only (`search_social_graph` RPC); "Искать дальше" button triggers full profiles search (`search_global` RPC, excludes already-shown IDs); 2-char threshold, 300ms debounce, browser Supabase client; placeholder "Имя или @никнейм"; matches username / name / surname / transliteration in both directions (Latin query → `transliterate_ru(p.name/surname)`; Cyrillic query → `transliterate_ru(lower(p_prefix))` vs Latin fields); global results in separate card under "Другие пользователи"; search results in `grouped-card` with avatar + @username + name + status-aware button; existing friends list in `grouped-card` with wishlist count + birthday subline; `<CreateInviteSection />`: card with 🎁 emoji, "Скопировать" + "Поделиться" pill buttons, invite URL pre-generated on mount, formatted message with sender's first name
 - Friends section (Home): `.grouped-card`, avatar h-10 w-10, name+surname, second line: `N вишлиста • День рождения DD месяц` — count=0 suppressed, birthday omitted if null; `ml-[68px]` divider after avatar
@@ -68,6 +69,26 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 ---
 
 ## Current focus
+
+Session 2026-06-11. Home UI polish deployed to production on `main`.
+
+Home polish (2026-06-11):
+- "Мои вишлисты" section removed from Home; own wishlists remain accessible via Wishlists tab; "Создать первый вишлист" CTA preserved for users with no wishlists
+- `itemCountsResult` Round 2 query removed (was exclusively used by removed section); Round 2 is now 6 queries
+- Feed typography: `new_wishlist` events render inline (removed `<br />` between verb phrase and title link); timestamp span gets `whitespace-nowrap` to prevent mid-token line breaks across all event types
+- `moreItemsLabel()` helper removed from `home/page.tsx` (no longer needed)
+- Expiration guide auto-dismiss: `createWishlistAction` in `features/wishlists/actions.ts` now sets `wishlist_expiration_guide_completed_at = now()` when NULL; users who create a wishlist via the new form never see the migration guide
+
+Session 2026-06-11. Phase 1 activity feed improvements deployed to production on `main` (commit `cfbbbaf`).
+
+Phase 1 feed (2026-06-11):
+- Birthday approaching events added (1–14 day window; synthetic ts for sort positioning; Russian day/week labels)
+- Feed window extended 7 → 14 days for all event types
+- `new_items` grouping key changed from `(owner_id, wishlist_id, calendar_day)` to `(owner_id, wishlist_id)` — one event per wishlist per rolling window
+- PGRST201 bug fixed on `new_wishlist` and `new_items` queries: ambiguous `profiles!inner` embed removed; owner names resolved via `profileById` Map (built from `friendProfilesResult` in Round 2)
+- Dead code removed: `wishlist_access_granted` event type + `AccessGrantedRow` type + `wishlist_access` Round 1 query (feed had excluded these since 2026-06-05)
+- Migration `20260613000000_guide_new_user_auto_dismiss.sql`: `handle_new_user` trigger updated to pre-dismiss expiration guide for all new registrations (pending manual apply in SQL editor)
+- `lib/format.ts`: `birthdayFeedLabel()` and `newFriendCountLabel()` helpers added
 
 Session 2026-06-12. Wishlist expiration onboarding + Home empty-state CTA fix deployed to production on `main`.
 
@@ -294,6 +315,7 @@ Remaining work:
 | 20260610000002 | Applied | `friend_recommendation_dismissals` table + `get_friend_recommendations(p_limit int)` SECURITY DEFINER RPC |
 | 20260611000000 | Pending (manual) | `wishlists.expires_on DATE NULL` + `wishlists.auto_archived_at TIMESTAMPTZ NULL` — run in SQL editor: `ALTER TABLE wishlists ADD COLUMN expires_on DATE NULL; ALTER TABLE wishlists ADD COLUMN auto_archived_at TIMESTAMPTZ NULL;` then `NOTIFY pgrst, 'reload schema';` |
 | 20260612000000 | Pending (manual) | `profiles.wishlist_expiration_guide_completed_at TIMESTAMPTZ NULL` — run in SQL editor: `ALTER TABLE profiles ADD COLUMN wishlist_expiration_guide_completed_at TIMESTAMPTZ NULL;` |
+| 20260613000000 | Pending (manual) | `handle_new_user` trigger updated: pre-dismisses `wishlist_expiration_guide_completed_at` for all new registrations — run in SQL editor (no backfill; no `NOTIFY pgrst` needed) |
 
 ---
 
@@ -313,13 +335,13 @@ Remaining work:
 - **Password change uses re-auth** — `signInWithPassword` server-side before `updateUser`.
 - **Username is immutable after registration.** CHECK: `^[a-z][a-z0-9_]{1,28}[a-z0-9]$`, no `__`. Min 3 chars.
 - **Username auto-generation:** `generate_username(name, surname)` DB function. Mirrored in `register-form.tsx` (`buildUsernamePreview`) — keep in sync.
-- **Activity feed grouping:** `new_items` group by `(owner_id, wishlist_id, calendar_day)` in JS.
-- **Activity feed event types:** `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_access_granted`, `wishlist_auto_archived`. All computed at query time from existing tables — no events table. `wishlist_auto_archived` queries the current user's own wishlists where `auto_archived_at IS NOT NULL AND >= sevenDaysAgo`.
+- **Activity feed grouping:** `new_items` group by `(owner_id, wishlist_id)` in JS — one event per wishlist across the full 14-day rolling window (not per calendar day).
+- **Activity feed event types:** `birthday_approaching`, `new_friend`, `new_wishlist`, `new_items`, `wishlist_item_reserved`, `wishlist_auto_archived`. All computed at query time from existing tables — no events table. `wishlist_auto_archived` queries the current user's own wishlists where `auto_archived_at IS NOT NULL AND >= fourteenDaysAgo`. `wishlist_access_granted` was removed from the feed on 2026-06-05 (leaks private wishlist names).
 - **`wishlist_item_reserved` label:** deterministic from reservation UUID char-code sum mod 4 — same event always shows same text across renders.
 - **`wishlist_access_granted` feed event:** REMOVED from feed (2026-06-05). All `wishlist_access` entries are `selected_friends` by definition — showing them in the feed leaks private wishlist names.
 - **Font loading:** `next/font/google`, Inter, `['latin', 'cyrillic']`, `--font-inter`, `display: 'swap'`.
 - **Item count pattern:** Separate query `select('wishlist_id').in(...)` → `Map<string, number>`. Duplicated across pages; refactor deferred.
-- **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`, `formatBirthdayLong` (ISO date → "9 февраля 1985"; used in profile display). Do not redefine locally. `moreItemsLabel` stays local to `home/page.tsx`.
+- **Shared formatting helpers (`lib/format.ts`):** `pluralRu`, `getDaysUntilBirthday`, `friendBirthdayLine`, `formatBirthdayLong` (ISO date → "9 февраля 1985"; used in profile display), `birthdayFeedLabel(daysUntil)` (feed label for upcoming birthdays), `newFriendCountLabel(n)` (Russian genitive count phrase for friend events). Do not redefine locally.
 - **Divider system (three CSS classes):** `.grouped-card-divider` — feed rows, 90% centered, `var(--divider)`. `.row-divider` — full-width entity rows (friends list, search results, wishlists/"Я подарю"), `var(--divider)`. `.item-divider` — wish rows inside wishlist detail grouped-card, 90% centered, static `#e5e7eb` light / `#3a3a3c` dark (not CSS-var to preserve distinct visual weight from feed dividers).
 - **Friend search architecture:** `SearchSection` client component uses `getSupabaseBrowserClient()` for live RPC calls. Mutations via server actions + `revalidatePath('/friends')`. State classification derived from server props; updated optimistically. Two search modes: (1) default — `search_social_graph(p_prefix)` walks the friendship graph (2nd + 3rd degree, CTE-based, SECURITY DEFINER STABLE, LIMIT 15), called automatically after 300ms debounce; (2) extended — `search_global(p_prefix, p_exclude_ids uuid[])` scans all profiles, called only after user taps "Искать дальше" (LIMIT 20). Extended mode and results reset on every query change. Both RPCs match username, name, surname in both directions: `transliterate_ru(p.name/surname) LIKE lower(p_prefix)||'%'` (Latin query → Cyrillic field) and `p.username/name/surname LIKE transliterate_ru(lower(p_prefix))||'%'` (Cyrillic query → Latin field). Transliterated query computed once per call as CTE / inline subquery. `transliterate_ru()` is plpgsql IMMUTABLE, replace()-based.
 - **Search status derivation:** `effectiveStatus = query.length < 2 ? 'idle' : status` — derived in render, avoids `react-hooks/set-state-in-effect` lint error.

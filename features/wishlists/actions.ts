@@ -69,7 +69,15 @@ export async function createWishlistAction(
     return { message: 'Не удалось создать вишлист. Попробуйте ещё раз.' }
   }
 
+  // User has seen the expiration UI in the creation form — dismiss the migration guide if still pending.
+  await supabase
+    .from('profiles')
+    .update({ wishlist_expiration_guide_completed_at: new Date().toISOString() })
+    .eq('id', user.id)
+    .is('wishlist_expiration_guide_completed_at', null)
+
   revalidatePath('/wishlists')
+  revalidatePath('/home')
   return { success: true }
 }
 
