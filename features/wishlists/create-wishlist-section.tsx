@@ -122,7 +122,7 @@ export function CreateWishlistSection() {
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="grouped-card mt-3 flex w-full items-center justify-between px-4 py-4 text-left"
+        className="grouped-card mt-3 overflow-hidden flex w-full items-center justify-between px-4 py-4 text-left"
       >
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Создать вишлист</p>
@@ -134,7 +134,7 @@ export function CreateWishlistSection() {
   }
 
   return (
-    <div ref={cardRef} className="grouped-card mt-3">
+    <div ref={cardRef} className="grouped-card mt-3 overflow-hidden">
       <form onSubmit={handleSubmit}>
 
         {/* Title */}

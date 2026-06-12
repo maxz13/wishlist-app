@@ -71,7 +71,6 @@ export async function registerAction(
     { p_username: username }
   )
   if (rpcError) {
-    console.error('[registerAction] is_username_available error (username=%s):', username, rpcError)
     return { message: `Ошибка регистрации. Попробуйте ещё раз.` }
   }
   if (!usernameAvailable) {
@@ -88,7 +87,6 @@ export async function registerAction(
   })
 
   if (error) {
-    console.error('[registerAction] Supabase signUp error:', error)
     const detail =
       process.env.NODE_ENV === 'development'
         ? ` (${error.status ?? '?'}: ${error.message})`

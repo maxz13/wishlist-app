@@ -487,7 +487,7 @@ export default async function HomePage() {
   if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity && incomingRequestsList.length === 0) {
     return (
       <main className="px-4 pb-10 pt-4">
-        <h1 className="text-xl font-semibold">Лента</h1>
+        <h1 className="section-title">Лента</h1>
         <div className="mt-12 flex flex-col items-center gap-3 text-center">
           <p className="text-base font-medium text-gray-800 dark:text-gray-200">Пока здесь пусто</p>
           <p className="max-w-xs text-sm text-gray-500">

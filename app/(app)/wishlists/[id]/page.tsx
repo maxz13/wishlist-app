@@ -86,8 +86,16 @@ export default async function WishlistDetailPage({
     itemsQuery = itemsQuery.eq('is_visible', true)
   }
 
-  const { data: itemsData } = await itemsQuery
-  const items = (itemsData ?? []) as WishlistItem[]
+  const [itemsResult, ownerProfileResult] = await Promise.all([
+    itemsQuery,
+    isOwner
+      ? Promise.resolve(null)
+      : supabase.from('profiles').select('name, surname').eq('id', wishlist.owner_id).single(),
+  ])
+  const items = (itemsResult.data ?? []) as WishlistItem[]
+  const ownerName: string | null = ownerProfileResult?.data
+    ? [ownerProfileResult.data.name, ownerProfileResult.data.surname].filter(Boolean).join(' ')
+    : null
   const backHref =
     !isOwner && fromFriend ? `/friends/${fromFriend}` : '/wishlists'
 
@@ -144,6 +152,11 @@ export default async function WishlistDetailPage({
       </Link>
 
       <div className="mt-3">
+        {!isOwner && ownerName && (
+          <p className="mb-0.5 text-sm text-gray-500 dark:text-gray-400">
+            Вишлист · {ownerName}
+          </p>
+        )}
         <WishlistTitle wishlistId={id} title={wishlist.title} isOwner={isOwner} />
         <div className="mt-1">
           <WishlistExpiration
