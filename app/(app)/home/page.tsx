@@ -380,7 +380,7 @@ export default async function HomePage() {
 
   // wishlist_item_reserved: items owned by current user that were reserved by someone else
   const reservedItemEvents: ActivityEvent[] = ((newReservationsResult.data ?? []) as unknown as ReservedActivityRow[])
-    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived && (r.wishlist_items.wishlists.visibility === 'all_friends' || r.wishlist_items.wishlists.visibility === 'family'))
+    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived)
     .map((r) => ({
       type:          'wishlist_item_reserved' as const,
       itemId:        r.wishlist_items.id,

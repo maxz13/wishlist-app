@@ -68,7 +68,7 @@ export function FeedList({ events }: { events: ActivityEvent[] }) {
     <div className={scrollable ? 'relative mt-4' : ''}>
     <ul
       ref={ulRef}
-      className={`mx-3${scrollable ? ' overflow-y-auto' : ' mt-4'}`}
+      className={`mx-3${scrollable ? ' overflow-hidden' : ' mt-4'}`}
       style={scrollable && collapsedHeight !== null ? { maxHeight: collapsedHeight } : undefined}
     >
       {events.map((event, i) => (
