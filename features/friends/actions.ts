@@ -92,6 +92,48 @@ export async function dismissRecommendationAction(dismissedUserId: string): Prom
   return {}
 }
 
+export async function updateFamilyMembersAction(ids: string[]): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('update_family_members', { p_ids: ids })
+  if (error) return { error: 'Не удалось сохранить. Попробуйте ещё раз.' }
+  revalidatePath('/friends')
+  return {}
+}
+
+export async function sendFamilyRequestAction(toUserId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('send_family_request', { p_to_user_id: toUserId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  return {}
+}
+
+export async function acceptFamilyRequestAction(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('accept_family_request', { p_request_id: requestId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  revalidatePath('/home')
+  return {}
+}
+
+export async function declineFamilyRequestAction(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('decline_family_request', { p_request_id: requestId })
+  if (error) return { error: error.message }
+  revalidatePath('/friends')
+  revalidatePath('/home')
+  return {}
+}
+
+export async function removeFamilyMemberAction(familyUserId: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.rpc('remove_family_member', { p_family_user_id: familyUserId })
+  if (error) return { error: 'Не удалось убрать из семьи. Попробуйте ещё раз.' }
+  revalidatePath('/friends')
+  return {}
+}
+
 export async function removeFriendAction(friendId: string): Promise<{ error?: string }> {
   const supabase = await createServerSupabaseClient()
   const {

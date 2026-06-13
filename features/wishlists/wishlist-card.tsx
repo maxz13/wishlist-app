@@ -118,6 +118,11 @@ export function WishlistCard({ id, title, itemCount, isArchived, visibility, sel
                 Скрыт от всех
               </p>
             )}
+            {!isArchived && visibility === 'family' && (
+              <p className="mt-0.5 text-xs text-gray-400">
+                Виден семье
+              </p>
+            )}
             {!isArchived && visibility === 'selected_friends' && (selectedFriendsCount ?? 0) > 0 && (
               <p className="mt-0.5 text-xs text-gray-400">
                 Виден {selectedFriendsCount} {pluralRu(selectedFriendsCount ?? 0, 'другу', 'друзьям', 'друзьям')}

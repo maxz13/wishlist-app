@@ -1,24 +1,23 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { acceptFriendRequestAction, declineFriendRequestAction } from './actions'
+import { acceptFamilyRequestAction, declineFamilyRequestAction } from './actions'
 
-export type IncomingRequest = {
+export type IncomingFamilyRequest = {
   id: string
   fromUserId: string
   fromProfile: {
     name: string
     surname: string
-    username: string
     avatar_url: string | null
   }
 }
 
 type Props = {
-  requests: IncomingRequest[]
+  requests: IncomingFamilyRequest[]
 }
 
-export function IncomingRequestsSection({ requests: initialRequests }: Props) {
+export function IncomingFamilyRequestsSection({ requests: initialRequests }: Props) {
   const [requests, setRequests] = useState(initialRequests)
   const [, startTransition] = useTransition()
 
@@ -30,7 +29,7 @@ export function IncomingRequestsSection({ requests: initialRequests }: Props) {
 
   return (
     <section className="mt-6">
-      <h2 className="mb-2 section-title">Входящие запросы</h2>
+      <h2 className="mb-2 section-title">Приглашения в семью</h2>
       <ul className="grouped-card">
         {requests.map((req, i) => (
           <li key={req.id}>
@@ -47,20 +46,22 @@ export function IncomingRequestsSection({ requests: initialRequests }: Props) {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{req.fromProfile.name} {req.fromProfile.surname}</p>
-                <p className="truncate text-xs text-gray-400">@{req.fromProfile.username}</p>
+                <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {req.fromProfile.name} {req.fromProfile.surname}
+                </p>
+                <p className="truncate text-xs text-gray-400">Приглашение в семью</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
-                  onClick={() => { remove(req.id); startTransition(async () => { await acceptFriendRequestAction(req.id) }) }}
+                  onClick={() => { remove(req.id); startTransition(async () => { await acceptFamilyRequestAction(req.id) }) }}
                   className="rounded-lg bg-[#22c55e] px-3 py-1.5 text-xs font-medium text-white"
                 >
                   Принять
                 </button>
                 <button
                   type="button"
-                  onClick={() => { remove(req.id); startTransition(async () => { await declineFriendRequestAction(req.id) }) }}
+                  onClick={() => { remove(req.id); startTransition(async () => { await declineFamilyRequestAction(req.id) }) }}
                   className="rounded-lg bg-[#ef4444] px-3 py-1.5 text-xs font-medium text-white"
                 >
                   Отклонить

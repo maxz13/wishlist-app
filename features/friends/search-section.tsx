@@ -90,7 +90,7 @@ export function SearchSection({ initialFriendIds, initialOutgoingIds, initialInc
       <li key={r.id}>
         {i > 0 && <div className="row-divider" />}
         <div className="flex items-center gap-3 px-4 py-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
             {r.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={r.avatar_url} alt="" className="h-full w-full object-cover" />

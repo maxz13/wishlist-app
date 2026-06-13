@@ -108,6 +108,8 @@ the skeleton appears. This is a framework-level constraint without `cacheCompone
 
 Note: `wishlist_access` query removed (2026-06-05, access_granted event removed from feed).
 
+**Family Groups additions (2026-06-13):** Round 1 extended with a 10th query: `family_requests WHERE to_user_id = me` (incoming family invitations for Home page). Feed filters updated: `new_wishlist` uses `.in('visibility', ['all_friends', 'family'])` at DB level; `new_items` and `wishlist_item_reserved` JS filters extended to include `family` visibility. `family` events carry `fromFamily: true` — no extra query, computed from the visibility field already fetched.
+
 **Round 2** — 6 conditional queries depending on Round 1 IDs:
 - sender profiles (→ `rawRequests`)
 - friend profiles (→ `friendIds`)

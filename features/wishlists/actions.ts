@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const CreateWishlistSchema = z.object({
   title:      z.string().min(1, 'Введите название').trim(),
-  visibility: z.enum(['all_friends', 'private']),
+  visibility: z.enum(['all_friends', 'family', 'private']),
 })
 
 export type CreateWishlistState =
@@ -370,7 +370,7 @@ export async function updateWishlistVisibilityAction(
   visibility: string,
   friendIds: string[]
 ): Promise<{ error?: string }> {
-  if (!['all_friends', 'private', 'selected_friends'].includes(visibility)) {
+  if (!['all_friends', 'family', 'private', 'selected_friends'].includes(visibility)) {
     return { error: 'Неверный тип доступа' }
   }
 

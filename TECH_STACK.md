@@ -391,3 +391,20 @@ On near-white backgrounds (`#fafafa`, `#ffffff`), `backdrop-blur` visually domin
 ## Gradient overlays near BottomNav
 
 Avoid absolutely-positioned gradient divs inside or adjacent to `<BottomNav>`. They can create visual artifacts above the central `+` button due to CSS layer stacking conflicts with the absolute-positioned nav. If a fade is needed at the nav edge, place it inside the scrollable content container (not as a sibling of the nav in the shell).
+
+## Avatar shape — proportional rounded squares
+
+Avatars are rounded squares (not circles). Radius ≈ 30% of avatar size:
+
+| Size | Class |
+|---|---|
+| 24–28px | `rounded-[8px]` |
+| 40px | `rounded-xl` (reference) |
+| 64px | `rounded-[20px]` |
+| 128px | `rounded-[40px]` |
+
+Pattern: `overflow-hidden rounded-[Xpx]` on wrapper; `h-full w-full object-cover` on `<img>`. Do not add radius directly to `<img>`. Notification dots, segmented control pills, and the blue FAB remain `rounded-full`.
+
+## Family visibility — dynamic RLS, no access rows
+
+`family` wishlist visibility is resolved at query time via `family_members` and `can_friend_see_wishlist()`. No rows in `wishlist_access` are created for `family` wishlists — access is automatic for all family members and revoked immediately on removal. Contrast with `selected_friends` visibility, which still uses explicit `wishlist_access` rows (per-wishlist guest list).

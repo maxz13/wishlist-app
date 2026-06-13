@@ -142,7 +142,7 @@ export default async function FriendProfilePage({
                   href={`/friends/${p.id}`}
                   className="flex items-center gap-3 px-4 py-3"
                 >
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
                     {p.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={p.avatar_url} alt="" className="h-full w-full object-cover" />

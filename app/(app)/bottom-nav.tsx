@@ -126,7 +126,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
           {avatarUrl ? (
             <span
               className={
-                'flex h-7 w-7 shrink-0 overflow-hidden rounded-full ' +
+                'flex h-7 w-7 shrink-0 overflow-hidden rounded-[8px] ' +
                 (isActive('/profile') ? 'border-2 border-[#3b82f6]' : '')
               }
             >
@@ -138,7 +138,7 @@ export function BottomNav({ initials, avatarUrl, hasPendingRequests, hasUnreadIn
           ) : (
             <span
               className={
-                iconBox + ' rounded-full text-[10px] font-bold ' +
+                iconBox + ' rounded-[8px] text-[10px] font-bold ' +
                 (isActive('/profile') ? 'bg-[#3b82f6] text-white' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300')
               }
             >

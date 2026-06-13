@@ -1,12 +1,15 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { CreateInviteSection } from '@/features/friends/create-invite-section'
 import { pluralRu, friendBirthdayLine } from '@/lib/format'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
+import { IncomingFamilyRequestsSection } from '@/features/friends/incoming-family-requests-section'
+import type { IncomingFamilyRequest } from '@/features/friends/incoming-family-requests-section'
 import { SearchSection } from '@/features/friends/search-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
+import { FriendsTabSection } from '@/features/friends/friends-tab-section'
+import type { FriendRow } from '@/features/friends/friends-tab-section'
 
 type FriendProfile = {
   id: string
@@ -36,7 +39,7 @@ export default async function FriendsPage() {
 
   const friendIds = (friendships ?? []).map((f) => f.friend_id as string)
 
-  const [friendsResult, requestsResult, recommendationsResult] = await Promise.all([
+  const [friendsResult, requestsResult, recommendationsResult, familyResult, familyRequestsResult] = await Promise.all([
     friendIds.length > 0
       ? supabase
           .from('profiles')
@@ -48,10 +51,33 @@ export default async function FriendsPage() {
       .from('friend_requests')
       .select('id, from_user_id, to_user_id'),
     supabase.rpc('get_friend_recommendations', { p_limit: 8 }),
+    supabase.from('family_members').select('family_user_id'),
+    supabase
+      .from('family_requests')
+      .select('id, from_user_id, to_user_id'),
   ])
 
   const friends = (friendsResult.data ?? []) as FriendProfile[]
+  const familyMemberIds = (familyResult.data ?? []).map(r => (r as { family_user_id: string }).family_user_id)
   const allRequests = (requestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+
+  const friendProfileById = new Map(friends.map(f => [f.id, f]))
+
+  const allFamilyRequests = (familyRequestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+  const incomingFamilyRequests = allFamilyRequests.filter(r => r.to_user_id === user!.id)
+  const outgoingFamilyRequests = allFamilyRequests.filter(r => r.from_user_id === user!.id)
+  const pendingOutgoingFamilyIds = outgoingFamilyRequests.map(r => r.to_user_id)
+  const pendingIncomingFamilyIds = incomingFamilyRequests.map(r => r.from_user_id)
+
+  const incomingFamilyRequestsList: IncomingFamilyRequest[] = incomingFamilyRequests.flatMap((r) => {
+    const profile = friendProfileById.get(r.from_user_id)
+    if (!profile) return []
+    return [{
+      id: r.id,
+      fromUserId: r.from_user_id,
+      fromProfile: { name: profile.name, surname: profile.surname, avatar_url: profile.avatar_url },
+    }]
+  })
 
   const outgoingRequests = allRequests.filter(r => r.from_user_id === user!.id)
   const incomingRequests = allRequests.filter(r => r.to_user_id === user!.id)
@@ -134,9 +160,29 @@ export default async function FriendsPage() {
     }
   }
 
+  const friendRows: FriendRow[] = friends.map(friend => {
+    const count = friendWishlistCountMap.get(friend.id) ?? 0
+    const itemCount = friendItemCountMap.get(friend.id) ?? 0
+    const mutualCount = mutualCountMap.get(friend.id) ?? 0
+    const birthdayLine = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
+    const parts: string[] = []
+    if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
+    if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
+    if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
+    return {
+      id: friend.id,
+      name: friend.name,
+      surname: friend.surname,
+      avatar_url: friend.avatar_url,
+      subline: parts.length > 0 ? parts.join(' • ') : null,
+      birthdayLine,
+    }
+  })
+
   return (
     <main className="p-4">
       <IncomingRequestsSection requests={incomingRequestsList} />
+      <IncomingFamilyRequestsSection requests={incomingFamilyRequestsList} />
 
       <SearchSection
         initialFriendIds={friendIds}
@@ -145,6 +191,13 @@ export default async function FriendsPage() {
       />
 
       <CreateInviteSection />
+
+      <FriendsTabSection
+        friends={friendRows}
+        familyMemberIds={familyMemberIds}
+        pendingOutgoingFamilyIds={pendingOutgoingFamilyIds}
+        pendingIncomingFamilyIds={pendingIncomingFamilyIds}
+      />
 
       {recommendations.length > 0 && (
         <section className="mt-6">
@@ -156,61 +209,6 @@ export default async function FriendsPage() {
           />
         </section>
       )}
-
-      <section className="mt-8">
-        <h2 className="mb-2 section-title">Мои друзья</h2>
-        {friends.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-4 text-center">
-            <p className="text-base font-medium text-gray-800 dark:text-gray-200">
-              У вас пока нет друзей
-            </p>
-            <p className="max-w-xs text-sm text-gray-500">
-              Пригласите друзей — вы сможете видеть их вишлисты и координировать
-              подарки.
-            </p>
-          </div>
-        ) : (
-          <ul className="grouped-card">
-            {friends.map((friend, i) => {
-              const count = friendWishlistCountMap.get(friend.id) ?? 0
-              const itemCount = friendItemCountMap.get(friend.id) ?? 0
-              const mutualCount = mutualCountMap.get(friend.id) ?? 0
-              const birthday = friend.birthday ? friendBirthdayLine(friend.birthday, today) : null
-              const parts: string[] = []
-              if (mutualCount > 0) parts.push(`${mutualCount} ${pluralRu(mutualCount, 'общий друг', 'общих друга', 'общих друзей')}`)
-              if (count > 0)       parts.push(`${count} ${pluralRu(count, 'вишлист', 'вишлиста', 'вишлистов')}`)
-              if (itemCount > 0)   parts.push(`${itemCount} ${pluralRu(itemCount, 'желание', 'желания', 'желаний')}`)
-              const subline = parts.length > 0 ? parts.join(' • ') : null
-              return (
-                <li key={friend.id}>
-                  {i > 0 && <div className="row-divider" />}
-                  <Link
-                    href={`/friends/${friend.id}`}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
-                      {friend.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center bg-gray-200 dark:bg-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                          {(friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{friend.name} {friend.surname}</p>
-                      {subline && <p className="text-xs text-gray-400">{subline}</p>}
-                      {birthday && <p className="text-xs text-gray-400">{birthday}</p>}
-                    </div>
-                    <span className="shrink-0 text-gray-400">›</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
     </main>
   )
 }

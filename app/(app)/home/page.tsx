@@ -6,6 +6,8 @@ import { FeedList } from './feed-list'
 import type { ActivityEvent } from './feed-list'
 import { IncomingRequestsSection } from '@/features/friends/incoming-requests-section'
 import type { IncomingRequest } from '@/features/friends/incoming-requests-section'
+import { IncomingFamilyRequestsSection } from '@/features/friends/incoming-family-requests-section'
+import type { IncomingFamilyRequest } from '@/features/friends/incoming-family-requests-section'
 import { RecommendationsSection } from '@/features/friends/recommendations-section'
 import { ExpirationGuideCard } from '@/features/wishlists/expiration-guide-card'
 import { CreateWishlistTrigger } from '@/features/wishlists/create-wishlist-trigger'
@@ -26,6 +28,7 @@ type WishlistActivityRow = {
   title: string
   created_at: string
   owner_id: string
+  visibility: string
 }
 type ItemActivityRow = {
   id: string
@@ -88,6 +91,7 @@ export default async function HomePage() {
     recommendationsResult,
     autoArchivedResult,
     profileFlagsResult,
+    familyRequestsResult,
   ] = await Promise.all([
     supabase
       .from('friendships')
@@ -134,6 +138,10 @@ export default async function HomePage() {
       .select('wishlist_expiration_guide_completed_at')
       .eq('id', user!.id)
       .single(),
+    supabase
+      .from('family_requests')
+      .select('id, from_user_id, to_user_id')
+      .eq('to_user_id', user!.id),
   ])
 
   // Derive IDs from Round 1 results
@@ -201,10 +209,10 @@ export default async function HomePage() {
       if (friendIds.length === 0) return { data: [] as WishlistActivityRow[] }
       return supabase
         .from('wishlists')
-        .select('id, title, created_at, owner_id')
+        .select('id, title, created_at, owner_id, visibility')
         .in('owner_id', friendIds)
         .eq('is_archived', false)
-        .eq('visibility', 'all_friends')
+        .in('visibility', ['all_friends', 'family'])
         .gte('created_at', fourteenDaysAgo)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -248,6 +256,18 @@ export default async function HomePage() {
 
   const friends    = (friendProfilesResult.data ?? []) as Friend[]
   const profileById = new Map(friends.map((f) => [f.id, f]))
+
+  const incomingFamilyRequestsList: IncomingFamilyRequest[] = (
+    (familyRequestsResult.data ?? []) as Array<{ id: string; from_user_id: string; to_user_id: string }>
+  ).flatMap((r) => {
+    const profile = profileById.get(r.from_user_id)
+    if (!profile) return []
+    return [{
+      id: r.id,
+      fromUserId: r.from_user_id,
+      fromProfile: { name: profile.name, surname: profile.surname, avatar_url: profile.avatar_url },
+    }]
+  })
 
   const friendWishlistRows = (friendWishlistsResult.data ?? []) as Array<{ id: string; owner_id: string }>
   const wishlistIdToOwnerId = new Map(friendWishlistRows.map(w => [w.id, w.owner_id]))
@@ -294,7 +314,7 @@ export default async function HomePage() {
 
   const newWishlistsRaw = (newWishlistsResult.data ?? []) as unknown as WishlistActivityRow[]
   const newItemsRaw     = ((newItemsResult.data ?? []) as unknown as ItemActivityRow[])
-    .filter((item) => item.wishlists.owner_id !== user!.id && !item.wishlists.is_archived && item.wishlists.visibility === 'all_friends')
+    .filter((item) => item.wishlists.owner_id !== user!.id && !item.wishlists.is_archived && (item.wishlists.visibility === 'all_friends' || item.wishlists.visibility === 'family'))
 
   // --- Build activity events ---
 
@@ -323,6 +343,7 @@ export default async function HomePage() {
       wishlistTitle: w.title,
       friendId:      profile.id,
       friendName:    profile.name,
+      fromFamily:    w.visibility === 'family',
       ts:            w.created_at,
     }]
   })
@@ -352,13 +373,14 @@ export default async function HomePage() {
       wishlistTitle: first.wishlists.title,
       friendId:      profile.id,
       friendName:    profile.name,
+      fromFamily:    first.wishlists.visibility === 'family',
       ts:            latestTs,
     }]
   })
 
   // wishlist_item_reserved: items owned by current user that were reserved by someone else
   const reservedItemEvents: ActivityEvent[] = ((newReservationsResult.data ?? []) as unknown as ReservedActivityRow[])
-    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived && r.wishlist_items.wishlists.visibility === 'all_friends')
+    .filter((r) => r.wishlist_items.wishlists.owner_id === user!.id && !r.wishlist_items.wishlists.is_archived && (r.wishlist_items.wishlists.visibility === 'all_friends' || r.wishlist_items.wishlists.visibility === 'family'))
     .map((r) => ({
       type:          'wishlist_item_reserved' as const,
       itemId:        r.wishlist_items.id,
@@ -409,6 +431,7 @@ export default async function HomePage() {
         friendId:      w.friendId,
         friendName:    w.friendName,
         count:         itemEvent.count,
+        fromFamily:    w.fromFamily,
         ts:            w.ts,
       })
     } else {
@@ -484,7 +507,7 @@ export default async function HomePage() {
   }
 
   // State A: nothing to show at all
-  if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity && incomingRequestsList.length === 0) {
+  if (!hasFriends && !hasWishlists && !hasReservations && !hasActivity && incomingRequestsList.length === 0 && incomingFamilyRequestsList.length === 0) {
     return (
       <main className="px-4 pb-10 pt-4">
         <h1 className="section-title">Лента</h1>
@@ -514,6 +537,7 @@ export default async function HomePage() {
       <h1 className="text-xl font-semibold">Лента</h1>
 
       <IncomingRequestsSection requests={incomingRequestsList} />
+      <IncomingFamilyRequestsSection requests={incomingFamilyRequestsList} />
 
       {showGuideCard && firstGuideWishlistId != null && (
         <ExpirationGuideCard firstWishlistId={firstGuideWishlistId} />
@@ -568,7 +592,7 @@ export default async function HomePage() {
                           href={`/friends/${friend.id}`}
                           className="flex items-center gap-3 px-4 py-3"
                         >
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full">
+                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl">
                             {friend.avatar_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />

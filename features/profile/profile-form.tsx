@@ -383,7 +383,7 @@ export function ProfileForm({ profile }: Props) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="relative h-32 w-32 overflow-hidden rounded-full"
+          className="relative h-32 w-32 overflow-hidden rounded-[40px]"
           disabled={avatarLoading}
           aria-label="Изменить фото"
         >

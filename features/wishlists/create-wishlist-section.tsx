@@ -6,7 +6,7 @@ import { createWishlistAction } from './actions'
 import type { CreateWishlistState } from './actions'
 
 type ExpiryMode = 'date' | 'timeless'
-type Visibility  = 'all_friends' | 'private'
+type Visibility  = 'all_friends' | 'family' | 'private'
 
 export function CreateWishlistSection() {
   const [expanded,   setExpanded]   = useState(false)
@@ -216,6 +216,16 @@ export function CreateWishlistSection() {
                   {visibility === 'all_friends' ? '●' : '○'}
                 </span>
                 Все друзья
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibility('family')}
+                className="flex items-center gap-1.5 text-sm text-gray-900 dark:text-gray-100"
+              >
+                <span className={visibility === 'family' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'}>
+                  {visibility === 'family' ? '●' : '○'}
+                </span>
+                Семья
               </button>
               <button
                 type="button"

@@ -7,9 +7,9 @@ import { pluralRu, birthdayFeedLabel } from '@/lib/format'
 export type ActivityEvent =
   | { type: 'birthday_approaching';    friendId: string; friendName: string; daysUntil: number; ts: string }
   | { type: 'new_friend';              friendId: string; friendName: string; friendSurname: string; ts: string }
-  | { type: 'new_wishlist';            wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
-  | { type: 'new_wishlist_with_items'; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; count: number; ts: string }
-  | { type: 'new_items';               count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; ts: string }
+  | { type: 'new_wishlist';            wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; fromFamily?: boolean; ts: string }
+  | { type: 'new_wishlist_with_items'; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; count: number; fromFamily?: boolean; ts: string }
+  | { type: 'new_items';               count: number; singleTitle: string | null; wishlistId: string; wishlistTitle: string; friendId: string; friendName: string; fromFamily?: boolean; ts: string }
   | { type: 'wishlist_item_reserved';  itemId: string; itemTitle: string; wishlistId: string; wishlistTitle: string; label: string; ts: string }
   | { type: 'wishlist_auto_archived';  wishlistId: string; wishlistTitle: string; ts: string }
 
@@ -99,7 +99,7 @@ export function FeedList({ events }: { events: ActivityEvent[] }) {
                 <Link href={`/friends/${event.friendId}`} className="font-medium">
                   {event.friendName}
                 </Link>
-                {' создал(а) вишлист '}
+                {event.fromFamily ? ' из вашей семьи создал(а) вишлист ' : ' создал(а) вишлист '}
                 <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                   «{event.wishlistTitle}»
                 </Link>
@@ -109,7 +109,7 @@ export function FeedList({ events }: { events: ActivityEvent[] }) {
                 <Link href={`/friends/${event.friendId}`} className="font-medium">
                   {event.friendName}
                 </Link>
-                {' создал(а) вишлист '}
+                {event.fromFamily ? ' из вашей семьи создал(а) вишлист ' : ' создал(а) вишлист '}
                 <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                   «{event.wishlistTitle}»
                 </Link>
@@ -120,7 +120,7 @@ export function FeedList({ events }: { events: ActivityEvent[] }) {
                 <Link href={`/friends/${event.friendId}`} className="font-medium">
                   {event.friendName}
                 </Link>
-                {' добавил(а) желание'}<br />
+                {event.fromFamily ? ' из вашей семьи добавил(а) желание' : ' добавил(а) желание'}<br />
                 <span className="font-medium">{event.singleTitle}</span><br />
                 {'в '}
                 <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
@@ -132,7 +132,9 @@ export function FeedList({ events }: { events: ActivityEvent[] }) {
                 <Link href={`/friends/${event.friendId}`} className="font-medium">
                   {event.friendName}
                 </Link>
-                {` добавил(а) ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
+                {event.fromFamily
+                  ? ` из вашей семьи добавил(а) ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`
+                  : ` добавил(а) ${event.count} ${pluralRu(event.count, 'желание', 'желания', 'желаний')}`}
                 {' в '}
                 <Link href={`/wishlists/${event.wishlistId}`} className="font-medium">
                   «{event.wishlistTitle}»

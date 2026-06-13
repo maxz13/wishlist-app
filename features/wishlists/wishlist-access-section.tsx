@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { pluralRu } from '@/lib/format'
 import { updateWishlistVisibilityAction } from './actions'
 
-export type WishlistVisibility = 'all_friends' | 'private' | 'selected_friends'
+export type WishlistVisibility = 'all_friends' | 'family' | 'private' | 'selected_friends'
 
 type Friend = { id: string; name: string; surname: string; avatar_url: string | null }
 
@@ -22,7 +22,8 @@ function collapsedLabel(
   friends: Friend[],
 ): string {
   if (visibility === 'all_friends') return 'Все друзья'
-  if (visibility === 'private') return 'Только я'
+  if (visibility === 'family')      return 'Семья'
+  if (visibility === 'private')     return 'Только я'
   const count = selectedFriendIds.length
   if (count === 0) return 'Только я'
   if (count <= 2) {
@@ -40,7 +41,7 @@ function Avatar({ friend, size }: { friend: Friend; size: 'sm' | 'xs' }) {
   const textSize = size === 'sm' ? 'text-xs' : 'text-[9px]'
   const initials = (friend.name[0] + (friend.surname?.[0] ?? '')).toUpperCase()
   return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full`}>
+    <div className={`${dim} shrink-0 overflow-hidden rounded-[8px]`}>
       {friend.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={friend.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -55,8 +56,9 @@ function Avatar({ friend, size }: { friend: Friend; size: 'sm' | 'xs' }) {
 
 const VISIBILITY_OPTIONS: { value: WishlistVisibility; label: string }[] = [
   { value: 'all_friends',      label: 'Все друзья' },
-  { value: 'private',          label: 'Только я' },
+  { value: 'family',           label: 'Семья' },
   { value: 'selected_friends', label: 'Выбранные друзья' },
+  { value: 'private',          label: 'Только я' },
 ]
 
 export function WishlistAccessSection({

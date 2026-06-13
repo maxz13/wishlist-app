@@ -185,3 +185,41 @@ On iOS:
 - **Web limitation:** iOS Safari only opens the software keyboard when `focus()` is called synchronously within a trusted user gesture handler. After client-side route navigation (which is async), `autoFocus` and imperative `.focus()` calls land outside the gesture window — the keyboard may not open automatically on the first navigation.
 - **iOS advantage:** `becomeFirstResponder()` called during `viewDidAppear` or during a push/present animation reliably opens the keyboard. This is a strict improvement over web behavior.
 - **Desired behavior on iOS:** tapping the plus button in the tab bar from any tab → navigate to Wishlists tab → expand create card → open keyboard on the title field — all in one gesture, no second tap required. Use `becomeFirstResponder()` in `viewWillAppear` or after the navigation animation completes.
+
+---
+
+## Avatar Shape
+
+Avatars are **rounded squares**, not circles. Do not use `Circle()` or `.clipShape(Circle())`.
+
+Use `RoundedRectangle(cornerRadius:)` with proportional corner radius (~30% of avatar size):
+
+| Size | Corner radius |
+|---|---|
+| 24 pt | 8 pt |
+| 28 pt | 8 pt |
+| 40 pt | 12 pt |
+| 64 pt | 20 pt |
+| 128 pt | 40 pt |
+
+Apply corner radius via `.clipShape(RoundedRectangle(cornerRadius: X, style: .continuous))` — use `.continuous` style for a squircle-like appearance consistent with iOS system UI.
+
+Exceptions that remain circular (do not change):
+- Activity indicator dots (e.g., online status green dot)
+- The central tab bar add button (large blue FAB)
+- Segmented control active pill
+
+---
+
+## Family Groups
+
+Family is a **mutual confirmed relationship** — distinct from friendship.
+
+Key invariants for porting:
+- Adding someone to family requires sending an invitation; the other side must accept before the relationship is mutual.
+- `accept_family_request` inserts **both directions** atomically — one acceptance makes both parties family members simultaneously.
+- `remove_family_member` deletes **both directions** — one removal ends the relationship for both.
+- Family wishlist visibility (`family`) is dynamic: no per-wishlist guest list is maintained. Access is resolved at query time via the `family_members` table. This means a user added to family immediately sees all existing `family` wishlists — and loses access immediately on removal, with no extra cleanup step.
+- `selected_friends` visibility still uses `wishlist_access` rows (explicit guest list). These two systems are independent.
+- Family feed events appear only for family members (enforced at DB/RLS level). Copy pattern: "{Name} из вашей семьи создал(а) вишлист…" — the "из вашей семьи" phrase is inserted between the friend name and the verb.
+- Unfriending a user also cleans up all family state (both directions of `family_requests` and `family_request_declines`) atomically.
