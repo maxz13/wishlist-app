@@ -72,6 +72,14 @@ Scope is strictly controlled. Read `AI_RULES.md` and `MVP_SCOPE.md` before touch
 
 ## Current focus
 
+Session 2026-06-13 (continued). Mobile navigation hit-testing fix deployed to production on `main`.
+
+Mobile navigation fix (2026-06-13):
+- Home friend links and bottom nav could navigate to incorrect targets on iOS Safari PWA.
+- Root cause: nested `overflow-y-auto` scroll container inside the feed list (`FeedList`) created a second compositor layer that interfered with iOS WKWebView hit-testing when both the outer scroll container and the glass nav had active compositing layers (`backdrop-blur`). Taps in the nav area were routed to scroll content; taps on friend rows landed on the wrong row after scrolling.
+- Diagnosed using a temporary `TapDebugger` client component: capture-phase `pointerdown`/`click` listeners on `document` logging `event.target`, `document.elementFromPoint(x, y)`, `scrollTop`, and nav bounding rect — inspected via Safari Web Inspector over USB.
+- Fix: `overflow-y-auto` → `overflow-hidden` on the collapsible feed `<ul>` in `feed-list.tsx` (removes the nested scroll container entirely). Verified fixed on real iPhone hardware. `TapDebugger` removed after diagnosis.
+
 Session 2026-06-13 (continued). Family Groups v1 + avatar shape redesign deployed to production on `main`.
 
 Family Groups v1 + avatar redesign (2026-06-13):

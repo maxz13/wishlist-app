@@ -211,6 +211,14 @@ Exceptions that remain circular (do not change):
 
 ---
 
+## Hit-Testing and Compositor Layers (Web-specific; no iOS equivalent)
+
+On the web PWA, nested `overflow-y-auto` elements inside the `fixed inset-0` shell create extra GPU compositor layers in iOS WKWebView. Combined with `backdrop-filter` on the glass header and nav, these layers can cause taps to be routed to the wrong DOM element — symptoms include taps on the nav arriving at content behind it and taps on list rows landing one row off after scrolling.
+
+**iOS native:** UIKit hit-testing is deterministic. `UIView.hitTest(_:with:)` traverses the view hierarchy in Z-order; overlay views reliably intercept touches within their bounds. There is no equivalent of the web compositor mis-routing issue. The iOS port should implement the standard `UITabBarController` + `UIScrollView` model with no hit-testing ambiguity.
+
+**If hit-testing ever behaves unexpectedly on iOS:** check `UIView.isUserInteractionEnabled` on all ancestor views and ensure no transparent overlay is intercepting gestures above the intended target.
+
 ## Family Groups
 
 Family is a **mutual confirmed relationship** — distinct from friendship.

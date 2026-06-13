@@ -405,6 +405,12 @@ Avatars are rounded squares (not circles). Radius ≈ 30% of avatar size:
 
 Pattern: `overflow-hidden rounded-[Xpx]` on wrapper; `h-full w-full object-cover` on `<img>`. Do not add radius directly to `<img>`. Notification dots, segmented control pills, and the blue FAB remain `rounded-full`.
 
+## iOS Safari / PWA hit-testing and compositor layers
+
+Nested `overflow-y-auto` elements create additional GPU compositor layers in iOS WKWebView. When combined with `backdrop-filter` on the header and nav, multiple compositor layers can cause hit-tests to be routed to the wrong element — taps on the nav arrive at scroll content behind it, and taps on list rows land on the wrong row after scrolling.
+
+**Rule:** avoid `overflow-y-auto` inside the scrollable content area. Use `overflow-hidden` to cap visual height without creating a new scroll container. If debugging is needed: attach capture-phase `pointerdown`/`click` listeners at `document` level, log `event.target` and `document.elementFromPoint(x, y)`, and inspect via Safari Web Inspector over USB (Settings → Safari → Advanced → Web Inspector on iPhone; Safari → Develop → [device] on Mac — PWA appears as a "Web App" entry).
+
 ## Family visibility — dynamic RLS, no access rows
 
 `family` wishlist visibility is resolved at query time via `family_members` and `can_friend_see_wishlist()`. No rows in `wishlist_access` are created for `family` wishlists — access is automatic for all family members and revoked immediately on removal. Contrast with `selected_friends` visibility, which still uses explicit `wishlist_access` rows (per-wishlist guest list).
