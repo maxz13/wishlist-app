@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { logoutAction } from '@/features/auth/actions'
-import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction, updateFriendsListVisibilityAction } from './actions'
+import { updateProfileAction, updateAvatarUrlAction, removeAvatarAction, changePasswordAction, updateFriendsListVisibilityAction, deleteAccountAction } from './actions'
 import type { ChangePasswordState } from './actions'
 import { formatBirthdayLong } from '@/lib/format'
 
@@ -110,6 +110,11 @@ export function ProfileForm({ profile }: Props) {
   const [visibility, setVisibility] = useState<'friends' | 'private'>(profile.friends_list_visibility)
   const [visibilityOpen, setVisibilityOpen] = useState(false)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
+
+  // Account deletion
+  const [deleteConfirming, setDeleteConfirming] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deletePending, startDeleteTransition] = useTransition()
 
   const displayName = `${storedName} ${storedSurname}`
   const displayBirthday = storedBirthdayIso ? formatBirthdayLong(storedBirthdayIso) : null
@@ -357,6 +362,17 @@ export function ProfileForm({ profile }: Props) {
       setVisibility(prev)
       setVisibilityError(result.error)
     }
+  }
+
+  function handleDeleteAccount() {
+    setDeleteError(null)
+    startDeleteTransition(async () => {
+      const result = await deleteAccountAction()
+      if (result?.error) {
+        setDeleteError(result.error)
+        setDeleteConfirming(false)
+      }
+    })
   }
 
   return (
@@ -696,10 +712,45 @@ export function ProfileForm({ profile }: Props) {
         )}
       </section>
 
-      {/* ── Account deletion placeholder ── */}
+      {/* ── Account deletion ── */}
       <section>
-        <p className="text-sm text-gray-400">Удаление аккаунта</p>
-        <p className="mt-0.5 text-xs text-gray-400">Появится в следующей версии</p>
+        {!deleteConfirming ? (
+          <button
+            type="button"
+            onClick={() => setDeleteConfirming(true)}
+            className="text-sm text-gray-400"
+          >
+            Удалить аккаунт
+          </button>
+        ) : (
+          <div className="flex flex-col gap-4 rounded-2xl border border-red-100 bg-red-50/60 p-4 dark:border-red-900/30 dark:bg-red-950/20">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Удалить аккаунт?</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Это действие необратимо.</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Безвозвратно будут удалены:</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">профиль · друзья · вишлисты · желания</p>
+            </div>
+            {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirming(false); setDeleteError(null) }}
+                disabled={deletePending}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm text-gray-600 disabled:opacity-40 dark:border-[#323234] dark:text-gray-300"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deletePending}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+              >
+                {deletePending ? 'Удаление...' : 'Удалить аккаунт'}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
     </div>

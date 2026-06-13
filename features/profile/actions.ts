@@ -1,7 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { createClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const UpdateProfileSchema = z.object({
@@ -203,4 +205,26 @@ export async function dismissExpirationGuideAction(): Promise<void> {
     .update({ wishlist_expiration_guide_completed_at: new Date().toISOString() })
     .eq('id', user.id)
   revalidatePath('/home')
+}
+
+export async function deleteAccountAction(): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Не авторизован' }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { error: 'Удаление аккаунта временно недоступно. Попробуйте позже.' }
+  }
+
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey)
+
+  // Delete avatar file. Ignore errors — file may not exist.
+  await serviceClient.storage.from('avatars').remove([`${user.id}/avatar.jpg`])
+
+  const { error } = await serviceClient.auth.admin.deleteUser(user.id)
+  if (error) return { error: 'Не удалось удалить аккаунт. Попробуйте ещё раз.' }
+
+  redirect('/login')
 }
