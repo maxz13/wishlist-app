@@ -81,7 +81,10 @@ export default async function AppLayout({
         </div>
       </header>
 
-      <div className="absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content">{children}</div>
+      <div
+        className="absolute inset-x-0 top-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content will-change-transform"
+        style={{ bottom: 'calc(74px + env(safe-area-inset-bottom))' }}
+      >{children}</div>
 
       <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} hasUnreadInvitedWishlists={(unseenWishlistCount ?? 0) > 0} />
     </div>
