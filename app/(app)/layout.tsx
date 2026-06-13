@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { logoutAction } from '@/features/auth/actions'
 import { BottomNav } from './bottom-nav'
-import { TapDebugger } from './tap-debugger'
 
 export default async function AppLayout({
   children,
@@ -85,7 +84,6 @@ export default async function AppLayout({
       <div className="absolute inset-0 overflow-y-auto overscroll-y-contain pt-[88px] app-scroll-content">{children}</div>
 
       <BottomNav initials={initials} avatarUrl={profile.avatar_url ?? null} hasPendingRequests={(pendingCount ?? 0) > 0} hasUnreadInvitedWishlists={(unseenWishlistCount ?? 0) > 0} />
-      <TapDebugger />
     </div>
   )
 }
